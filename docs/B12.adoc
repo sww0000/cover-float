@@ -69,22 +69,22 @@ We chose to make the differing bits two bits to avoid borrowing canceling the di
 However, since this approach requires at least one differing bit to ensure we're canceling exactly k bits, we need a new method for `d = -p` as the entire mantissa will be canceled. Since this approach cancels bits, `d = 0, 1` will also need something different.
 
 Thus, we split the tests into four cases:
-. `d = -p`
-. `d` = all other `d`'s
-. `d = 0`
-. `d = 1`
+. d = -p
+. d = all other d's
+. d = 0
+. d = 1
 
 Only cases 1 and 3 will involve `b_exp` being different from `a_exp` (by 1, specifically). Only case 4 will have different sign assignments for `a` and `b` for addition and subtraction.
 
 == Test Procedure in Detail
 
 === Case 1
-*Case:* `d = -p`
+*Case:* `d = -p` +
 *Relevant Functions:* makeNegPMantissas, makeTestVectors
 
 To cancel exactly p bits when we only have `m` bits in the mantissa, we will take advantage of the shifting that happens when `a_exp` and `b_exp` don't match. What this means is that we will set `b_exp` to be 1 less than `a_exp`, so when the hardware aligns `a` and `b` for addition/subtraction, `b` would be shifted right with its leading 1 becoming the `p`th bit we cancel. Since all bits after the mantissa will default to 0, the LSB of `b` will be subtracted from 0. To make this meaningful, the LSB of `b` will be 1. Moreover, we need to construct `a_m` and `b_m` so that the borrowing will cascade from the LSB of `b` until canceling the leading 1 of `a` since the leading 1 of `b` is shifted right to cancel the MSB of `a_m`. Therefore, we set `a_m` to be 0, and `b_m` to be all 1's.
 
-Example:
+Example: +
 We have two operands in `FP_16`, each with a 10-bit mantissa. We're aiming to cancel 11 bits.
 [source]
 ----
@@ -113,12 +113,12 @@ r = 1.0000_0000_00   (exp = -1)
 Giving us our desired exponent difference of `max(a_exp, b_exp) - exp = 10 - (-1) = 11`.
 
 === Case 2
-*Case:* `d` = all other `d`'s
+*Case:* `d` = all other `d`'s +
 *Relevant Functions:* makeCancellationMantissas, makeTestVectors
 
 This case best reflects the general idea. Since we want to cancel `k - 1` bits in the mantissa (recall that the implicit 1 is also canceled), we will generate `k - 1` random bits as the prefix for both `a_m` and `b_m`. In `a_m`, this prefix will be followed by `11`, and `00` in `b_m`. The rest of `a_m` and `b_m` will be randomly generated. The detailed arithmetics in the code involves edge cases such as `k = 1, (m-1), m` that are handled by if statements.
 
-Example:
+Example: +
 We have two operands in `FP_32`, each with a 23-bit mantissa. We're aiming to cancel 9 bits.
 [source]
 ----
@@ -143,12 +143,12 @@ r = 1.1100_1000_1011_0100_0000_000   (exp = 11)
 Giving us our desired exponent difference of `max(a_exp, b_exp) - exp = 20 - 11 = 9`.
 
 === Case 3
-*Case:* `d = 0`
+*Case:* `d = 0` +
 *Relevant Functions:* makeNoCancelMantissas, makeTestVectors
 
 In this case, we don't want anything to cancel. This is difficult because the implicit 1 will cancel regardless of our mantissa, triggering a normalization. However, we can keep the implicit 1 of `a` by shifting the implicit 1 of `b` to the right. Just like case 1, this would involve setting `b_exp` to be 1 less than `a_exp`. For simplicity, we defined `a_m` to be all 1's, and `b_m` to be all 1's except the LSB, so that when the LSB shifts right and gets subtracted, it does not create the borrow propagation as in case 1.
 
-Example:
+Example: +
 We have two operands in `FP_16`, each with a 10-bit mantissa. We're aiming to cancel 0 bits.
 [source]
 ----
@@ -172,12 +172,12 @@ r = 1.0000_0000_00 (exp = 10)
 Which will be the final result since there is no normalization required, giving us our desired exponent difference of `max(a_exp, b_exp) - exp = 10 - 10 = 0`.
 
 === Case 4
-*Case:* `d = 1`
+*Case:* `d = 1` +
 *Relevant Functions:* makeCarryMantissas, makeTestVectors
 
 This case requires a carry, which is only achievable through adding positive numbers or subtracting a negative number. This means that the sign assignments must now be positive `a` and positive `b` for addition, and positive `a` and negative `b` for subtraction. Moreover, `a_m` and `b_m` must be able to create a carry when added together. For simplicity, we decided to set both `a_m` and `b_m` to the largest number (all 1's) to guarantee a carry.
 
-Example:
+Example: +
 We have two operands in `FP_16`, each with a 10-bit mantissa. We're aiming to cancel -1 bits.
 [source]
 ----
