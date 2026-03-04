@@ -1,23 +1,7 @@
 """
-Angela Zheng
+Angela Zheng (angela20061015@gmail.com)
 
 February 10, 2026
-
-SUMMARY
-This script generates cancellation test vectors for the B12 model:
-
-    For the difference d between the exponent of the intermediate result
-    and the maximum exponent of the inputs:
-        d ∈ [-p, +1]
-    Enable Bits: XE
-
-DEFINITION
-p: precision of the format, including the hidden 1. (# mantissa bits + 1)
-a: first operand
-b: second operand
-d: the difference between max(a_exp, b_exp) and exponent of the intermediate result
-
-Total test vectors generated: 438
 """
 # TODO: For future: implement logic to get different a and b exponents in regular cases
 
@@ -72,17 +56,19 @@ def makeCancellationMantissas(fmt: str, d: int) -> tuple[int, int]:
     m = MANTISSA_BITS[fmt]
     k = -d
 
+    # 10 mantissa bits.
+    # a = 1 11 0101011
+    # b = 1 00 0101011
     # prefix for a and b
-    if d == 0:
-        a_m = 1 << (m - 1) | 1 << (m - 2) | random.getrandbits(m - 2)
-        b_m = 0 << (m - 1) | 0 << (m - 2) | random.getrandbits(m - 2)
-        return a_m, b_m
-    else:
-        a_prefix = 1 << (m - 1) | random.getrandbits(k - 1) << (m - k)
+    if k > 1:
+        a_prefix = random.getrandbits(k - 1) << (m - k + 1)  # 21 2
         b_prefix = a_prefix
+    else:
+        a_prefix = 0
+        b_prefix = 0
 
     # differing bit
-    diff_bit = 1 << (m - k - 1)
+    diff_bit = 1 << (m - k)  # 1
 
     # tails
     if k < (m - 1):
@@ -98,24 +84,6 @@ def makeCancellationMantissas(fmt: str, d: int) -> tuple[int, int]:
     return a_m, b_m
 
 
-def makeExactCancelMantissas(fmt: str) -> tuple[int, int]:
-    """
-    Generate mantissas so that exactly m bits cancel.
-    """
-
-    # a = 11011011011110111111001 0     0 + 21 random bits (identical) + ends in 1
-    # b = 101101101111011111100 01      same 21 bits (identical) + ends in 01
-    # b = 11011011011110111111000 1     after b shifts right, it is in alignment to cancel m bits
-
-    m = MANTISSA_BITS[fmt]
-
-    identical = random.getrandbits(m - 2)
-    a_m = 1 << (m - 1) | identical << 1 | 1
-    b_m = identical | 0 << 1 | 1
-
-    return a_m, b_m
-
-
 def makeCarryMantissas(fmt: str) -> tuple[int, int]:
     """
     Force carry for d = +1
@@ -125,6 +93,33 @@ def makeCarryMantissas(fmt: str) -> tuple[int, int]:
 
     a_m = (1 << m) - 1  # 1.111...111
     b_m = 1  # 1.000...001 (LSB set)
+
+    return a_m, b_m
+
+
+def makeNoCancelMantissas(fmt: str) -> tuple[int, int]:
+    m = MANTISSA_BITS[fmt]
+
+    a_m = (1 << m) - 1
+    b_m = ((1 << (m - 1)) - 1) << 1
+
+    return a_m, b_m
+
+
+def makeExactCancelMantissas(fmt: str) -> tuple[int, int]:
+    """
+    Generate mantissas so that exactly m bits cancel.
+    """
+
+    # a = 1.11011011011110111111011 0     1 + 21 random bits (identical) + ends in 1
+    # b = 1.10110110111101111110110       same 21 bits (identical) + ends in 01
+    # b = 0.11011011011110111111010 1     after b shifts right, it is in alignment to cancel m bits
+
+    m = MANTISSA_BITS[fmt]
+
+    identical = random.getrandbits(m - 1)
+    a_m = identical << 1 | 1
+    b_m = identical << 1 | 0
 
     return a_m, b_m
 
@@ -158,12 +153,14 @@ def makeTestVectors(fmt: str, d: int, operation: str, test_f: TextIO, cover_f: T
     if d == 1:
         is_carry = True
         a_m, b_m = makeCarryMantissas(fmt)
+    elif d == 0:
+        a_m, b_m = makeNoCancelMantissas(fmt)
+        b_exp -= 1
     elif d == -p:
         a_m, b_m = makeNegPMantissas(fmt)
         b_exp -= 1
     elif d == -m:
         a_m, b_m = makeExactCancelMantissas(fmt)
-        b_exp -= 1
     else:
         a_m, b_m = makeCancellationMantissas(fmt, d)
 
