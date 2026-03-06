@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional, TextIO
 
 import cover_float.common.constants as common
+from cover_float.common.util import generate_test_vector, reproducible_hash
 from cover_float.reference import run_test_vector, store_cover_vector
 
 SRC1_OPS = [common.OP_SQRT]
@@ -20,7 +21,7 @@ TESTING = False
 
 
 def generate_float(sign: int, exponent: int, mantissa: int, fmt: str) -> int:
-    exponent += common.EXPONENT_BIASES[fmt]
+    exponent += common.BIAS[fmt]
     return (
         (sign << (common.MANTISSA_BITS[fmt] + common.EXPONENT_BITS[fmt]))
         | (exponent << common.MANTISSA_BITS[fmt])
@@ -42,11 +43,6 @@ def generate_random_float(exponent: int, fmt: str, sign: Optional[int] = None) -
 def get_significand_from_float(float_: int, fmt: str) -> int:
     mask = (1 << common.MANTISSA_BITS[fmt]) - 1
     return float_ & mask | (1 << common.MANTISSA_BITS[fmt])
-
-
-def generate_test_vector(op: str, in1: int, in2: int, in3: int, fmt1: str, fmt2: str, rnd_mode: str = "00") -> str:
-    zero_padding = "0" * 32
-    return f"{op}_{rnd_mode}_{in1:032x}_{in2:032x}_{in3:032x}_{fmt1}_{zero_padding}_{fmt2}_00\n"
 
 
 def extract_rounding_info(cover_vector: str) -> dict[str, int]:
@@ -101,6 +97,8 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     for op in FMA_OPS:
         for mode in common.ROUNDING_MODES:
+            random.seed(reproducible_hash(op + fmt + mode + "B3"))
+
             to_cover = targets[:]
 
             for _ in range(100):
@@ -111,7 +109,7 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                     Softfloat is going to crush extra bits into one with the shiftJam logic, and in
                     the f32 case, softfloat's rounding function takes a uint_fast32_t as input for
                     the significand. This means that it rounds based off of ~9 extra bits instead
-                    of all of the generated sticky bits (so we cannot get preaddition results
+                    of all of the generated sticky bits (so we cannot get pre-addition results
                     with an OP_FMADD x, y, 0 call).
 
                     The following is a calculation from s_mulAddF32.c:
@@ -150,14 +148,14 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
                 sigA_initial = random.randint(0, (1 << common.MANTISSA_BITS[fmt]) - 1)
                 sigB_initial = random.randint(0, (1 << common.MANTISSA_BITS[fmt]) - 1)
-                expA = random.randint(-10, 10) + common.EXPONENT_BIASES[fmt]
-                expB = random.randint(-10, 10) + common.EXPONENT_BIASES[fmt]
+                expA = random.randint(-10, 10) + common.BIAS[fmt]
+                expB = random.randint(-10, 10) + common.BIAS[fmt]
 
                 if fmt == common.FMT_HALF:
                     # Just be careful that we don't generate things that need
                     # to add a number that we don't have the exponents to add
-                    expA = random.randint(-1, 6) + common.EXPONENT_BIASES[fmt]
-                    expB = random.randint(-1, 6) + common.EXPONENT_BIASES[fmt]
+                    expA = random.randint(-1, 6) + common.BIAS[fmt]
+                    expB = random.randint(-1, 6) + common.BIAS[fmt]
 
                 # Put in the leading one
                 sigA = sigA_initial | (1 << common.MANTISSA_BITS[fmt])
@@ -166,7 +164,7 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 # Actually Multiply
                 sigProd = sigA * sigB
                 signProd = signA ^ signB  # zero iff both are the same
-                expProd = expA + expB - common.EXPONENT_BIASES[fmt] + 1
+                expProd = expA + expB - common.BIAS[fmt] + 1
 
                 # Correct for the actual operation
                 if op == common.OP_FNMADD or op == common.OP_FNMSUB:
@@ -216,9 +214,9 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 _new_sticky = new_rounding & (mask >> 1)
 
                 # Generate the FMA result
-                in1 = generate_float(signA, expA - common.EXPONENT_BIASES[fmt], sigA_initial, fmt)
-                in2 = generate_float(signB, expB - common.EXPONENT_BIASES[fmt], sigB_initial, fmt)
-                in3 = generate_float(signC, expC - common.EXPONENT_BIASES[fmt], sigC_initial, fmt)
+                in1 = generate_float(signA, expA - common.BIAS[fmt], sigA_initial, fmt)
+                in2 = generate_float(signB, expB - common.BIAS[fmt], sigB_initial, fmt)
+                in3 = generate_float(signC, expC - common.BIAS[fmt], sigC_initial, fmt)
 
                 tv = generate_test_vector(op, in1, in2, in3, fmt, fmt, mode)
                 result = run_test_vector(tv)
@@ -226,7 +224,7 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 if TESTING:
                     # These are very useful things to use when we test coverfloat and softfloat,
                     # but not so necessary otherwise
-                    negIn3 = generate_float(signC ^ 1, expC - common.EXPONENT_BIASES[fmt], sticky_bits, fmt)
+                    negIn3 = generate_float(signC ^ 1, expC - common.BIAS[fmt], sticky_bits, fmt)
                     fake_tv = generate_test_vector(op, in1, in2, 0, fmt, fmt, mode)
                     fake_tv_2 = generate_test_vector(common.OP_MUL, in1, in2, 0, fmt, fmt, mode)
                     fake_tv_3 = generate_test_vector(op, in1, in2, negIn3, fmt, fmt, mode)
@@ -248,7 +246,7 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                     shiftAmt = len(bin(sigProd)[2:]) - 1 - common.MANTISSA_BITS[fmt]
                     shiftedSigProd = sigProd >> shiftAmt
                     shiftedSigProd &= (1 << common.MANTISSA_BITS[fmt]) - 1
-                    in4 = generate_float(signA ^ signB ^ 1, expProd - common.EXPONENT_BIASES[fmt], shiftedSigProd, fmt)
+                    in4 = generate_float(signA ^ signB ^ 1, expProd - common.BIAS[fmt], shiftedSigProd, fmt)
                     tv_4 = generate_test_vector(common.OP_FMADD, in1, in2, in4, fmt, fmt, mode)
                     out_4 = run_test_vector(tv_4)
 
@@ -308,15 +306,16 @@ def write_add_sub_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     for op in ops:
         for mode in common.ROUNDING_MODES:
+            random.seed(reproducible_hash(op + fmt + mode + "B3"))
             for target in targets:
                 # Generate a random float for A
                 signA = target["Sign"]
 
-                # If the MSB of sigA_intial is 0, it prevents rounding up to another exponent
+                # If the MSB of sigA_initial is 0, it prevents rounding up to another exponent
                 sigA_initial = random.randint(0, (1 << (common.MANTISSA_BITS[fmt] - 1)) - 1)
 
                 _sigA = sigA_initial | (1 << common.MANTISSA_BITS[fmt])
-                expA = random.randint(-10, 14)  # + common.EXPONENT_BIASES[fmt]
+                expA = random.randint(-10, 14)  # + common.BIAS[fmt]
 
                 # How can we get rounding bits to be what we want?
                 # For add and sub, unfortunately, there is no way to get a lot of manipulation, like we could with fma
@@ -358,6 +357,8 @@ def write_mul_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     ]
 
     for mode in common.ROUNDING_MODES:
+        random.seed(reproducible_hash("MUL" + fmt + mode + "B3"))
+
         """
         We care about setting the last two bits as a result of our multiplication. Perhaps the simplest way
         is to use random chance. That is, we generate things that in theory multiply to the product
@@ -384,8 +385,8 @@ def write_mul_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
             # Randomize the rest, and don't overflow
             a_sign = random.randint(0, 1)
             b_sign = random.randint(0, 1)
-            a_exp = random.randint(-common.EXPONENT_BIASES[fmt] // 2 + 1, common.EXPONENT_BIASES[fmt] // 2 - 1)
-            b_exp = random.randint(-common.EXPONENT_BIASES[fmt] // 2 + 1, common.EXPONENT_BIASES[fmt] // 2 - 1)
+            a_exp = random.randint(-common.BIAS[fmt] // 2 + 1, common.BIAS[fmt] // 2 - 1)
+            b_exp = random.randint(-common.BIAS[fmt] // 2 + 1, common.BIAS[fmt] // 2 - 1)
 
             # Run everything
             a = generate_float(a_sign, a_exp, sig_a_initial, fmt)
@@ -411,7 +412,7 @@ def write_sqrt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     consider squaring a number with guard = 1 and an m bit mantissa
     then we have (1.(mantissa)1)**2 = (1 + (mantissa) + 2**(-p-1)) ** 2
     The mantissa has least power 2**(-p), so in the resulting expression there must be
-    a powere of 2 ** (-2p - 2), and unfortunately, we cannot represent this. Similar logic
+    a power of 2 ** (-2p - 2), and unfortunately, we cannot represent this. Similar logic
     means that LSB = 1, is also impossible.
 
     This means that the possible cases are LSB = 0, Guard = 0, Sticky = 0 :(
@@ -432,6 +433,7 @@ def write_sqrt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     ]
 
     for mode in common.ROUNDING_MODES:
+        random.seed(reproducible_hash("SQRT" + fmt + mode + "B3"))
         # Our life is very easy, we just need a random number filled half way with bits
         usable_bits = common.MANTISSA_BITS[fmt] // 2 - 1
         mantissa = random.randint(1, (1 << (usable_bits)) - 1)
@@ -439,7 +441,7 @@ def write_sqrt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
         mantissa |= 1 << common.MANTISSA_BITS[fmt]
 
         # Just something that can be doubled
-        exp = random.randint(3, common.EXPONENT_BIASES[fmt] - 3) - (common.EXPONENT_BIASES[fmt] // 2)
+        exp = random.randint(3, common.BIAS[fmt] - 3) - (common.BIAS[fmt] // 2)
 
         # Square the mantissa
         squared_mantissa = mantissa * mantissa
@@ -507,6 +509,8 @@ def write_div_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     ]
 
     for mode in common.ROUNDING_MODES:
+        random.seed(reproducible_hash("DIV" + fmt + mode + "B3"))
+
         # for target in targets:
         # For now while we have spontaneous failures here, this is better
         goals = targets[:]
@@ -535,7 +539,7 @@ def write_div_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
             sig2 = sig2_mant << sig2_shift
             sign2 = sign1 ^ target["Sign"]
 
-            exp1 = random.randint(-common.EXPONENT_BIASES[fmt] + 1, -common.MANTISSA_BITS[fmt] + 1)
+            exp1 = random.randint(-common.BIAS[fmt] + 1, -common.MANTISSA_BITS[fmt] + 1)
 
             # Mirroring soft_float calculation
             sig1_64 = sig1 << (common.MANTISSA_BITS[fmt] + 1 if sig1 < sig2 else common.MANTISSA_BITS[fmt])
@@ -557,7 +561,7 @@ def write_div_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
             # We want exp1 - exp2 + exponent_bias = -required_shift
             # so, exp2 = exp1 + exponent_bias + required_shift
             # -1 because softfloat
-            exp2 = exp1 + common.EXPONENT_BIASES[fmt] + required_shift - 1
+            exp2 = exp1 + common.BIAS[fmt] + required_shift - 1
 
             if sig1 < sig2:
                 exp2 -= 1
@@ -611,6 +615,7 @@ def write_cvt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     # CFI Test Gen
     for mode in common.ROUNDING_MODES:
+        random.seed(reproducible_hash("CFI" + fmt + mode + "B3"))
         for target_fmt in cvt_ops_targets[common.OP_CFI]:
             goals = targets[:]
 
@@ -687,6 +692,7 @@ def write_cvt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     # CFF Test Gen: We choose fmt to be the target
     for mode in common.ROUNDING_MODES:
+        random.seed(reproducible_hash("CFF" + fmt + mode + "B3"))
         for target_fmt in cvt_ops_targets[common.OP_CFF]:
             mantissa_diff = common.MANTISSA_BITS[target_fmt] - common.MANTISSA_BITS[fmt]
 
@@ -726,6 +732,7 @@ def write_cvt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     # CIF Test Gen:
     for mode in common.ROUNDING_MODES:
+        random.seed(reproducible_hash("CIF" + fmt + mode + "B3"))
         for target_fmt in cvt_ops_targets[common.OP_CIF]:
             # -1 for the leading 1!
             mantissa_diff = common.INT_MAX_EXPS[target_fmt] - common.MANTISSA_BITS[fmt] - 1
@@ -766,9 +773,7 @@ def write_cvt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
 
 def main() -> None:
-    random.seed(hash("B3"))
-
-    print("Running B3 :)")
+    random.seed(reproducible_hash("B3"))
 
     with (
         Path("./tests/testvectors/B3_tv.txt").open("w") as test_f,

@@ -41,7 +41,7 @@ To verify that all rounding modes are implemented correctly, we must check all c
 
 === Arithmetic Operations for Sticky = 1
 
-Sticky = 1 is the most likely case for a random floating point operation to evaluate to. In fact, this is nearly guaranteed for random values. If we assume that the probility of each bit being 0 or 1 after a random operation with random operands is uniform, then due to the large number of bits contributing to the sticky bit, we get that it is most likely that the sticky bit is 1. We also get that there are 50/50 chances that each of the guard bit and lsb are zero respectively. This means that random generation of inputs works for all operations to cover all cases when sticky = 1.
+Sticky = 1 is the most likely case for a random floating point operation to evaluate to. In fact, this is nearly guaranteed for random values. If we assume that the probability of each bit being 0 or 1 after a random operation with random operands is uniform, then due to the large number of bits contributing to the sticky bit, we get that it is most likely that the sticky bit is 1. We also get that there are 50/50 chances that each of the guard bit and lsb are zero respectively. This means that random generation of inputs works for all operations to cover all cases when sticky = 1.
 
 === Add/Sub for Sticky = 0
 
@@ -73,7 +73,7 @@ If we have an exact answer, then the simplified denominator can only have factor
 
 where K is any odd prime factors not canceled out and p is an integer. We canceled factors so K < S1. Thus, the binary representation of K must have as many or fewer digits than S1. The meaning of this is that guard = 1 is impossible for a normalized generated significand. Thus, guard = 1, sticky = 0 can only be accomplished with a subnorm result. Similarly, K and S1 are only the same length when S1 = K (as we can only cancel factors of two or greater), so for lsb = 1 cases, either we need to use trivial significands or also use subnorms.
 
-To generate random inputs, we can work backwards from a random K that we want to target, by simply setting the lower two bits to some target, then randomizeing the remaining bits (up to half of the mantissa). Some number of odd factors can part of S1 and S2, as long as they are the same, so those are also randomly generated.
+To generate random inputs, we can work backwards from a random K that we want to target, by simply setting the lower two bits to some target, then randomizing the remaining bits (up to half of the mantissa). Some number of odd factors can part of S1 and S2, as long as they are the same, so those are also randomly generated.
 
 === Sqrt for Sticky = 0
 
