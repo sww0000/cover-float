@@ -27,6 +27,7 @@ vector_count = 0
 
 
 def decimalComponentsToHex(fmt: str, sign: int, biased_exp: int, mantissa: int) -> str:
+    """Converts binary fp components into a 32-character padded hex string."""
     b_sign = f"{sign:01b}"
     b_exp = f"{biased_exp:0{EXPONENT_BITS[fmt]}b}"
     b_man = f"{mantissa:0{MANTISSA_BITS[fmt]}b}"
@@ -47,18 +48,21 @@ def writeSub(fmt: str, a_hex: str, b_hex: str, test_f: TextIO, cover_f: TextIO) 
 
 
 def makeNegPMantissas(fmt: str) -> tuple[int, int]:
+    """Create mantissas for the most extreme cancellation (d = -p)"""
     m = MANTISSA_BITS[fmt]
 
-    a_m = 0
-    b_m = (1 << m) - 1
+    a_m = 0  # A = 1.00...0 (Mantissa 0)
+    b_m = (1 << m) - 1  # B = 1.11...1 (Mantissa all 1s)
 
     return a_m, b_m
 
 
 def makeCancellationMantissas(fmt: str, d: int) -> tuple[int, int]:
+    """Generate identical -d bits for both mantissas such that exactly -d bits cancel."""
     m = MANTISSA_BITS[fmt]
     k = -d
 
+    # generate identical prefixes for both operands
     if k > 1:
         a_prefix = random.getrandbits(k - 1) << (m - k + 1)
         b_prefix = a_prefix
@@ -66,8 +70,9 @@ def makeCancellationMantissas(fmt: str, d: int) -> tuple[int, int]:
         a_prefix = 0
         b_prefix = 0
 
-    diff_bit = 1 << (m - k)
+    diff_bit = 1 << (m - k)  # differing bit
 
+    # randomly generate tails for both operands
     if k < (m - 1):
         a_tail = 1 << (m - k - 2) | random.getrandbits(m - k - 2)
         b_tail = random.getrandbits(m - k - 2)
@@ -82,6 +87,7 @@ def makeCancellationMantissas(fmt: str, d: int) -> tuple[int, int]:
 
 
 def makeNoCancelMantissas(fmt: str) -> tuple[int, int]:
+    """Generate mantissas that result in no bit cancellation (d = 0)"""
     m = MANTISSA_BITS[fmt]
 
     a_m = (1 << m) - 1
@@ -91,10 +97,11 @@ def makeNoCancelMantissas(fmt: str) -> tuple[int, int]:
 
 
 def makeCarryMantissas(fmt: str) -> tuple[int, int]:
+    """Generate mantissas that will cause a carry (d = +1)"""
     m = MANTISSA_BITS[fmt]
 
     a_m = (1 << m) - 1  # 1.111...111
-    b_m = a_m  # 1.000...001 (LSB set)
+    b_m = a_m  # 1.111...111
 
     return a_m, b_m
 
@@ -108,11 +115,11 @@ def makeTestVectors(fmt: str, d: int, operation: str, test_f: TextIO, cover_f: T
     is_add = operation == "add"
     write_fn = writeAdd if is_add else writeSub
 
-    # Exponents
+    # Randomly generate exponents
     a_exp = random.randint(min_exp - d + 1, max_exp)
     b_exp = a_exp
 
-    # Mantissas
+    # Generate mantissas based on d
     if d == 1:
         is_carry = True
         a_m, b_m = makeCarryMantissas(fmt)
@@ -125,7 +132,7 @@ def makeTestVectors(fmt: str, d: int, operation: str, test_f: TextIO, cover_f: T
     else:
         a_m, b_m = makeCancellationMantissas(fmt, d)
 
-    # Signs
+    # Sign assignments based on whether d is 1
     if is_add:
         if is_carry:
             a_sign = 0
