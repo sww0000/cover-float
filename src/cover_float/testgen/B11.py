@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TextIO
 
 import cover_float.common.constants as constants
-from cover_float.common.util import generate_float, generate_test_vector
+from cover_float.common.util import generate_float, generate_test_vector, reproducible_hash
 from cover_float.reference import run_and_store_test_vector
 from cover_float.testgen.B9 import B9SignificandGenerator
 
@@ -58,7 +58,7 @@ def uninteresting_tests(
     sigs: list[int], interesting_shifts: list[int], fmt: str, test_f: TextIO, cover_f: TextIO
 ) -> None:
     nf = constants.MANTISSA_BITS[fmt]
-    possible_shifts = [shift for shift in range(-nf - 3, nf + 2 + 1) if shift not in interesting_shifts]
+    possible_shifts = [shift for shift in range(-nf - 5, nf + 4 + 1) if shift not in interesting_shifts]
     shift_generator = itertools.cycle(possible_shifts)
 
     exp_min, exp_max = constants.BIASED_EXP[fmt]
@@ -71,9 +71,9 @@ def uninteresting_tests(
             # in the future, i.e. pass a generator?
             shift = next(shift_generator)
 
-            if shift == -nf - 3:
+            if shift == -nf - 5:
                 # We reserve this shift size for an arbitrary shift outside the normal range
-                shift = random.randint(nf + 2, exp_max - 2)
+                shift = random.randint(nf + 5, max(exp_max - 2, nf + 5))
                 if random.random() < 0.5:
                     shift = -shift
 
@@ -96,6 +96,9 @@ def main() -> None:
         Path("tests/covervectors/B11_cv.txt").open("w") as cover_f,
     ):
         for fmt in constants.FLOAT_FMTS:
+            seed = reproducible_hash(fmt + "b11")
+            random.seed(seed)
+
             print(f"Generating {fmt} Sigs & Shifts")
             sig_gen = B9SignificandGenerator(constants.MANTISSA_BITS[fmt])
             sigs = [int(sig, 2) for sig in sig_gen.generate()]

@@ -175,8 +175,6 @@ def B9_generator(sigs: list[str], fmt: str, test_f: TextIO, cover_f: TextIO) -> 
 
 
 def main() -> None:
-    random.seed(9)
-
     with (
         Path("tests/testvectors/B9_tv.txt").open("w") as test_f,
         Path("tests/covervectors/B9_cv.txt").open("w") as cover_f,
