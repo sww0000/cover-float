@@ -46,6 +46,8 @@ class B15SignificandGenerator:
         self.nf = nf
 
     def checkerboards(self, patterns: Optional[list[tuple[int, int]]] = None) -> None:
+        random.seed(reproducible_hash(f"B15 Checkers {self.nf}"))
+
         if patterns is None:
             patterns = [(1, 0), (2, 0)]
 
@@ -62,6 +64,8 @@ class B15SignificandGenerator:
             self.sigs.append(B15Significand(sig1[1:], sig2[1:], res))
 
     def trailing_zeros(self, counts: Optional[list[int]] = None) -> None:
+        random.seed(reproducible_hash(f"B15 Trailing Zeros {self.nf}"))
+
         if counts is None:
             counts = [2 * self.nf - 1, 2 * self.nf - 2, 2 * self.nf - 3, self.nf, 3, 2, 1]
 
@@ -107,6 +111,8 @@ class B15SignificandGenerator:
         return (res, target // res)
 
     def leading_zeros(self, counts: Optional[list[int]] = None) -> None:
+        random.seed(reproducible_hash(f"B15 Leading Zeros {self.nf}"))
+
         if counts is None:
             counts = [2 * self.nf - 1, 2 * self.nf - 2, 2 * self.nf - 3, self.nf, 3, 2, 1]
 
@@ -117,7 +123,7 @@ class B15SignificandGenerator:
                 if f1 == 0:
                     continue
                 if score != 0:
-                    print("failure :( in leading zeros")
+                    continue
 
                 sig1 = bin(f1)[3:]
                 sig2 = bin(f2)[3:]
@@ -138,7 +144,6 @@ class B15SignificandGenerator:
                 # We can get away with a factoring approach in a small sample space
                 f1, f2 = self._leading_digit_factoring(self.nf, count, "0")
                 if f1 == 0:
-                    print("failure 3")
                     continue
 
                 sig1 = bin(f1)[3:]
@@ -292,6 +297,8 @@ class B15SignificandGenerator:
         return 0, 0
 
     def trailing_ones(self, counts: Optional[list[int]] = None) -> None:
+        random.seed(reproducible_hash(f"B15 Trailing Ones {self.nf}"))
+
         if counts is None:
             counts = [
                 2 * self.nf,
@@ -329,6 +336,8 @@ class B15SignificandGenerator:
             self.sigs.append(B15Significand(sig1, sig2, res))
 
     def leading_ones(self, counts: Optional[list[int]] = None) -> None:
+        random.seed(reproducible_hash(f"B15 Leading Ones {self.nf}"))
+
         if counts is None:
             counts = [
                 2 * self.nf - 1,
@@ -348,7 +357,7 @@ class B15SignificandGenerator:
                 score, f1, f2 = self._leading_digit_stochastic(self.nf, count, "1")
 
                 if score != 0:
-                    print("failure :( in leading ones")
+                    continue
 
                 sig1 = bin(f1)[3:]
                 sig2 = bin(f2)[3:]
@@ -361,14 +370,13 @@ class B15SignificandGenerator:
 
                 res = int(sig1, 2) * int(sig2, 2)
                 if not bin(res)[3:].startswith("1" * (2 * self.nf - 1)):
-                    print("failure 2")
+                    continue
 
                 self.sigs.append(B15Significand(sig1[1:], sig2[1:], res))
             elif self.nf != 112:
                 # We can get away with a factoring approach in a small sample space
                 f1, f2 = self._leading_digit_factoring(self.nf, count, "1")
                 if f1 == 0:
-                    print("failure 3")
                     continue
 
                 sig1 = bin(f1)[3:]
@@ -377,6 +385,8 @@ class B15SignificandGenerator:
                 self.sigs.append(B15Significand(sig1, sig2, res))
 
     def sparse_ones(self, positions: Optional[list[int]] = None) -> None:
+        random.seed(reproducible_hash(f"B15 Sparse Ones {self.nf}"))
+
         if self.nf == 112:
             return
 
@@ -405,6 +415,8 @@ class B15SignificandGenerator:
                 self.sigs.append(B15Significand(sig1, sig2, res))
 
     def sparse_zeros(self, positions: Optional[list[int]] = None) -> None:
+        random.seed(reproducible_hash(f"B15 Sparse Zeros {self.nf}"))
+
         if self.nf == 112:
             return
 
@@ -442,6 +454,8 @@ class B15SignificandGenerator:
         return answer
 
     def long_run_ones(self, run_lengths_and_offsets: Optional[list[tuple[int, int]]] = None) -> None:
+        random.seed(reproducible_hash(f"B15 Long Run Ones {self.nf}"))
+
         # Right now, what we are going to cover is runs in the middle of nf
         if run_lengths_and_offsets is None:
             run_lengths_and_offsets = []
@@ -491,6 +505,8 @@ class B15SignificandGenerator:
             self.sigs.append(B15Significand(bin(sig1)[3:], bin(sig2)[3:], res))
 
     def long_run_zeros(self, run_lengths_and_offsets: Optional[list[tuple[int, int]]] = None) -> None:
+        random.seed(reproducible_hash(f"B15 Long Run Zeros {self.nf}"))
+
         if run_lengths_and_offsets is None:
             run_lengths_and_offsets = []
 
@@ -507,8 +523,42 @@ class B15SignificandGenerator:
             # Like the leading zeros cases, we'll break it down into a stochastic search for good
             # factors and a search via factoring
 
-            if run_length + offset - self.nf < 20:
-                # We can generally get away with the stochastic search here
+            if self.nf != 112 and (run_length + offset - self.nf > 20 or 2 * self.nf - run_length - offset < 5):
+                # In these cases, factoring should work reasonably well
+
+                for _ in range(1024):
+                    # Give us some number of attempts to get it right
+                    final_length = 2 * self.nf - offset - run_length + 1
+                    final_digits = bin(random.getrandbits(final_length))[2:].zfill(final_length)
+                    if offset != 1:
+                        lead_digits = bin(random.getrandbits(offset - 2))[2:].zfill(offset - 2)
+                        if offset == 2:
+                            lead_digits = ""
+
+                        target_str = "1" + lead_digits + "1" + "0" * run_length + final_digits
+                    else:
+                        target_str = "1" + "0" * run_length + final_digits
+
+                    if len(target_str) != 2 * self.nf + 1:
+                        raise ValueError(
+                            f"Sanity Check Failed in Long_Run_Zeros, \n\ttarget_str={target_str}, len={len(target_str)}"
+                        )
+
+                    target = int(target_str, 2)
+                    if target < (1 << self.nf | 1) ** 2:
+                        target <<= 1
+
+                    factors: dict[int, int] = factorint(target)
+                    f1, f2 = self.factors_to_bit_width(factors, target, self.nf + 1)
+                    if f1 * f2 == target:
+                        sig1 = bin(f1)[3:]
+                        sig2 = bin(f2)[3:]
+                        self.sigs.append(B15Significand(sig1, sig2, target))
+                        break
+                else:
+                    print("Long Run Zeros Failed (factoring)")
+            elif run_length + offset - self.nf < 20:
+                # We can generally get away with the stochastic search here (limitation still exists for nf=112)
                 best = 2 * self.nf, 0, 0
 
                 for _ in range(10000000):
@@ -550,61 +600,29 @@ class B15SignificandGenerator:
                 sig2 = bin(best[2])[3:]
                 res = best[1] * best[2]
                 self.sigs.append(B15Significand(sig1, sig2, res))
-            elif self.nf != 112:
-                # We can have a factoring approach when the above stochastic approach is unlikely
-                # to work and factoring works reasonably quickly
-
-                for _ in range(1024):
-                    # Give us some number of attempts to get it right
-                    final_length = 2 * self.nf - offset - run_length + 1
-                    final_digits = bin(random.getrandbits(final_length))[2:].zfill(final_length)
-                    if offset != 1:
-                        lead_digits = bin(random.getrandbits(offset - 2))[2:].zfill(offset - 2)
-                        target_str = "1" + lead_digits + "1" + "0" * run_length + final_digits
-                    else:
-                        target_str = "1" + "0" * run_length + final_digits
-
-                    if len(target_str) != 2 * self.nf + 1:
-                        raise ValueError(
-                            f"Sanity Check Failed in Long_Run_Zeros, \n\ttarget_str={target_str}, len={len(target_str)}"
-                        )
-
-                    target = int(target_str, 2)
-                    if target < (1 << self.nf | 1) ** 2:
-                        target <<= 1
-
-                    factors: dict[int, int] = factorint(target)
-                    f1, f2 = self.factors_to_bit_width(factors, target, self.nf + 1)
-                    if f1 * f2 == target:
-                        sig1 = bin(f1)[3:]
-                        sig2 = bin(f2)[3:]
-                        self.sigs.append(B15Significand(sig1, sig2, target))
-                        break
-                else:
-                    print("Long Run Zeros Failed (factoring)")
 
     def generate(self) -> list[tuple[str, str]]:
-        print("Checker Boards")
+        print("\tChecker Boards")
         self.checkerboards()
-        print("Trailing Zeros")
+        print("\tTrailing Zeros")
         self.trailing_zeros()
-        print("Trailing Ones")
+        print("\tTrailing Ones")
         self.trailing_ones()
-        print("Leading Zeros")
+        print("\tLeading Zeros")
         self.leading_zeros()
-        print("Leading Ones")
+        print("\tLeading Ones")
         self.leading_ones()
         # Choose some very specific values I think as configuration, so many primes and so much hard work that can
         # be avoided just by doing all of the work ahead of time and picking interesting cases
-        print("Sparse Ones")
+        print("\tSparse Ones")
         # gen.sparse_ones([*range(0, 104)])
         self.sparse_ones()
-        print("Sparse Zeros")
+        print("\tSparse Zeros")
         self.sparse_zeros()
         # gen.sparse_zeros([*range(0, 104)])
-        print("Long Runs of Ones")
+        print("\tLong Runs of Ones")
         self.long_run_ones()
-        print("Long Runs of Zeros")
+        print("\tLong Runs of Zeros")
         self.long_run_zeros()
 
         return [(sig.sig1, sig.sig2) for sig in self.sigs]
