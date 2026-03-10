@@ -10,8 +10,8 @@ Aharoni et al.
 === Description
 
 === Design choices
-1. By significant, we took it as mantissa
-2.
+1. By significand, we took it as mantissa
+2. We don't test negative values of sqrt because they are tested in other models
 
 We have to separate different parts of the desired result because
 1. We need to toggle every bit of the mantissa only
@@ -42,26 +42,97 @@ subTest(fmt, sign, desired_result) -> writes the test vector into the testvector
 mulTest(fmt, desired_result_exp, desired_result) -> writes the test vector into the testvector.
     randomly generate a_sign
     randomly generate a_m
-    if desired_result_exp == bias:
-        randomly generate a_exp between 0 and bias
-    elif desired_result_exp == -limit of exponent:
-        randomly generate a_exp bewteen negative exponent limit and 0
-    else
-        randomly generate a_exp
+    randomly generate a_exp
     a_hex = binary to hex(a)
-    divide desired_result by a to get b
-    if (a*b equal to desired result)
+    divide desired_result by a to get b_hex
+    if (a_hex*b_hex equal to desired result)
         writes testvector
-    elif (a*b less than desired result)
+    elif (a_hex*b_hex less than desired result)
         b adds one ulp
-    elif (a*b more than desired result)
+        writes testvector
+    elif (a_hex*b_hex more than desired result)
         b subtract one ulp
-divTest(fmt, desired_result) -> writes the test vector into the testvector.
-sqrtTest
-fmaddTest
-fmsubTest
-fnmaddTest
-fnmsubTest
+        writes testvector
+divTest(fmt, desired_result) -> writes the test vector into the testvector. a/b=desired
+    randomly generate b_sign
+    randomly generate b_m
+    randomly generate b_exp
+    b_hex = binary to hex(b)
+    multiple desired_result by b to get a_hex
+    if (a_hex/b_hex equal to desired result)
+        writes testvector
+    elif (a_hex/b_hex less than desired result)
+        a adds one ulp
+        writes testvector
+    elif (a_hex/b_hex more than desired result)
+        a subtract one ulp
+        writes testvector
+sqrtTest(fmt, desired_result) given that desired_result is positive
+    a_hex = desired_result * desired_result
+    if (sqrt(a_hex) equal to desired result)
+        writes testvector
+    elif (sqrt(a_hex) less than desired result)
+        a adds one ulp
+        writes testvector
+    elif (sqrt(a_hex) more than desired result)
+        a subtract one ulp
+        writes testvector
+fmaddTest (a*b+c = desired result)
+    randomly generate a
+    randomly generate b
+    a_hex = binary to hex(a)
+    b_hex = binary to hex(b)
+    c_hex = fnmadd(a_hex, b_hex, desired_result)
+    if (fmadd(a_hex, b_hex, c_hex) equal to desired result)
+        writes testvector
+    elif (fmadd(a_hex, b_hex, c_hex) less than desired result)
+        c adds one ulp
+        writes testvector
+    elif (fmadd(a_hex, b_hex, c_hex) more than desired result)
+        c subtract one ulp
+        writes testvector
+fmsubTest (a*b-c = desired result)
+    randomly generate a
+    randomly generate b
+    a_hex = binary to hex(a)
+    b_hex = binary to hex(b)
+    c_hex = fmsub(a_hex, b_hex, desired_result)
+    if (fmsub(a_hex, b_hex, c_hex) equal to desired result)
+        writes testvector
+    elif (fmsub(a_hex, b_hex, c_hex) less than desired result)
+        c subtract one ulp
+        writes testvector
+    elif (fmsub(a_hex, b_hex, c_hex) more than desired result)
+        c add one ulp
+        writes testvector
+fnmaddTest (-a*b+c = desired result)
+    randomly generate a
+    randomly generate b
+    a_hex = binary to hex(a)
+    b_hex = binary to hex(b)
+    c_hex = fmadd(a_hex, b_hex, desired_result)
+    if (fnmadd(a_hex, b_hex, c_hex) equal to desired result)
+        writes testvector
+    elif (fnmadd(a_hex, b_hex, c_hex) less than desired result)
+        c adds one ulp
+        writes testvector
+    elif (fnmadd(a_hex, b_hex, c_hex) more than desired result)
+        c subtract one ulp
+        writes testvector
+fnmsubTest (-a*b-c = desired result)
+    randomly generate a
+    randomly generate b
+    a_hex = binary to hex(a)
+    b_hex = binary to hex(b)
+    c_hex = fnmsub(a_hex, b_hex, desired_result)
+    if (fnmsub(a_hex, b_hex, c_hex) equal to desired result)
+        writes testvector
+    elif (fnmsub(a_hex, b_hex, c_hex) less than desired result)
+        c subtract one ulp
+        writes testvector
+    elif (fnmsub(a_hex, b_hex, c_hex) more than desired result)
+        c add one ulp
+        writes testvector
 
 main
 for fmt in FORMATS
