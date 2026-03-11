@@ -142,3 +142,14 @@ for fmt in FORMATS
                 for sign in [0, 1]:
                     desired_result = desiredResultGenerator(sign, desired_m, desired_exp,)
                     addTest(fmt, desired_result)
+                    subTest(fmt, desired_result)
+                    mulTest(fmt, desired_result)
+                    divTest(fmt, desired_result)
+
+                    if sign == 0:
+                        sqrtTest(fmt, desired_result)
+
+                    fmaddTest(fmt, desired_result)
+                    fmsubTest(fmt, desired_result)
+                    fnmaddTest(fmt, desired_result)
+                    fnmsubTest(fmt, desired_result)
