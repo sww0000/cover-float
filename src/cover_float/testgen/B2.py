@@ -264,10 +264,9 @@ def main() -> None:
                     desired_m = base_m ^ (1 << i)
                     for sign in [0, 1]:
                         desired_result = decimalComponentsToHex(fmt, sign, base_e, desired_m)
-                        print(desired_result)
 
-                        test_add(fmt, desired_result, base_e, test_f, cover_f)
-                        # test_sub(fmt, desired_result, base_e, test_f, cover_f)
+                        # test_add(fmt, desired_result, base_e, test_f, cover_f)
+                        test_sub(fmt, desired_result, base_e, test_f, cover_f)
                         # test_mul(fmt, desired_result, test_f, cover_f)
                         # test_div(fmt, desired_result, test_f, cover_f)
 
