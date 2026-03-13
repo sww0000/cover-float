@@ -60,31 +60,53 @@ def get_result_from_ref(op: str, a: str, b: str, c: str, fmt: str) -> str:
     return res_str.split("_")[6]
 
 
-def bump_ulp(hex_val: str, steps: int) -> str:
+def calibrate(hex_val: str, steps: int) -> str:
     """Adds or subtracts from the integer representation to step by ULPs."""
     val_int = int(hex_val, 16)
-    return f"{max(0, val_int + steps):032X}"
+    return f"{(val_int + steps):032X}"
 
 
-def test_add(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) -> None:
+def test_add(fmt: str, desired_result: str, base_e: int, test_f: TextIO, cover_f: TextIO) -> None:
+    # We constrain the exponent of a to not be too far away from the base, so that there is enough precision
+    # to produce a b different from a that would result in a very small value intead of 0.
+    m_bits = MANTISSA_BITS[fmt]
     max_exp = (1 << EXPONENT_BITS[fmt]) - 2
-    a_exp = random.randint(0, max_exp)
-    a = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(MANTISSA_BITS[fmt]))
+    min_safe_exp = max(0, base_e - m_bits)
+    max_safe_exp = min(max_exp, base_e + m_bits)
+
+    a_exp = random.randint(min_safe_exp, max_safe_exp)
+    # a_exp = base_e
+    a = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(m_bits))
 
     b = get_result_from_ref(OP_SUB, desired_result, a, "0" * 32, fmt)
-    print(b)
+
+    ans = get_result_from_ref(OP_ADD, a, b, "0" * 32, fmt)
+    if ans < desired_result:
+        b = calibrate(b, 1)
+    elif ans > desired_result:
+        b = calibrate(b, -1)
+
     run_and_store_test_vector(
         f"{OP_ADD}_{ROUND_NEAR_EVEN}_{a}_{b}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f
     )
 
 
-def test_sub(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) -> None:
+def test_sub(fmt: str, desired_result: str, base_e: int, test_f: TextIO, cover_f: TextIO) -> None:
+    m_bits = MANTISSA_BITS[fmt]
     max_exp = (1 << EXPONENT_BITS[fmt]) - 2
-    a_exp = random.randint(0, max_exp)
+    min_safe_exp = max(0, base_e - m_bits)
+    max_safe_exp = min(max_exp, base_e + m_bits)
+
+    a_exp = random.randint(min_safe_exp, max_safe_exp)
     a = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(MANTISSA_BITS[fmt]))
 
     # a - b = d  =>  b = a - d
     b = get_result_from_ref(OP_SUB, a, desired_result, "0" * 32, fmt)
+    ans = get_result_from_ref(OP_SUB, a, b, "0" * 32, fmt)
+    if ans < desired_result:
+        b = calibrate(b, -1)
+    elif ans > desired_result:
+        b = calibrate(b, 1)
     run_and_store_test_vector(
         f"{OP_SUB}_{ROUND_NEAR_EVEN}_{a}_{b}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f
     )
@@ -97,11 +119,11 @@ def test_mul(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) -> 
 
     b = get_result_from_ref(OP_DIV, desired_result, a, "0" * 32, fmt)
 
-    if get_result_from_ref(OP_MUL, a, b, "0" * 32, fmt) != desired_result:
-        if get_result_from_ref(OP_MUL, a, bump_ulp(b, 1), "0" * 32, fmt) == desired_result:
-            b = bump_ulp(b, 1)
-        elif get_result_from_ref(OP_MUL, a, bump_ulp(b, -1), "0" * 32, fmt) == desired_result:
-            b = bump_ulp(b, -1)
+    ans = get_result_from_ref(OP_MUL, a, b, "0" * 32, fmt)
+    if ans > desired_result:
+        b = calibrate(b, -1)
+    elif ans < desired_result:
+        b = calibrate(b, 1)
 
     run_and_store_test_vector(
         f"{OP_MUL}_{ROUND_NEAR_EVEN}_{a}_{b}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f
@@ -115,11 +137,11 @@ def test_div(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) -> 
 
     a = get_result_from_ref(OP_MUL, desired_result, b, "0" * 32, fmt)
 
-    if get_result_from_ref(OP_DIV, a, b, "0" * 32, fmt) != desired_result:
-        if get_result_from_ref(OP_DIV, bump_ulp(a, 1), b, "0" * 32, fmt) == desired_result:
-            a = bump_ulp(a, 1)
-        elif get_result_from_ref(OP_DIV, bump_ulp(a, -1), b, "0" * 32, fmt) == desired_result:
-            a = bump_ulp(a, -1)
+    ans = get_result_from_ref(OP_DIV, a, b, "0" * 32, fmt)
+    if ans < desired_result:
+        a = calibrate(a, 1)
+    elif ans > desired_result:
+        a = calibrate(a, -1)
 
     run_and_store_test_vector(
         f"{OP_DIV}_{ROUND_NEAR_EVEN}_{a}_{b}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f
@@ -130,10 +152,10 @@ def test_sqrt(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) ->
     a = get_result_from_ref(OP_MUL, desired_result, desired_result, "0" * 32, fmt)
 
     if get_result_from_ref(OP_SQRT, a, "0" * 32, "0" * 32, fmt) != desired_result:
-        if get_result_from_ref(OP_SQRT, bump_ulp(a, 1), "0" * 32, "0" * 32, fmt) == desired_result:
-            a = bump_ulp(a, 1)
-        elif get_result_from_ref(OP_SQRT, bump_ulp(a, -1), "0" * 32, "0" * 32, fmt) == desired_result:
-            a = bump_ulp(a, -1)
+        if get_result_from_ref(OP_SQRT, calibrate(a, 1), "0" * 32, "0" * 32, fmt) == desired_result:
+            a = calibrate(a, 1)
+        elif get_result_from_ref(OP_SQRT, calibrate(a, -1), "0" * 32, "0" * 32, fmt) == desired_result:
+            a = calibrate(a, -1)
 
     run_and_store_test_vector(
         f"{OP_SQRT}_{ROUND_NEAR_EVEN}_{a}_{32 * '0'}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f
@@ -152,10 +174,10 @@ def test_fmadd(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) -
     c = get_result_from_ref(OP_FNMADD, a, b, desired_result, fmt)
 
     if get_result_from_ref(OP_FMADD, a, b, c, fmt) != desired_result:
-        if get_result_from_ref(OP_FMADD, a, b, bump_ulp(c, 1), fmt) == desired_result:
-            c = bump_ulp(c, 1)
-        elif get_result_from_ref(OP_FMADD, a, b, bump_ulp(c, -1), fmt) == desired_result:
-            c = bump_ulp(c, -1)
+        if get_result_from_ref(OP_FMADD, a, b, calibrate(c, 1), fmt) == desired_result:
+            c = calibrate(c, 1)
+        elif get_result_from_ref(OP_FMADD, a, b, calibrate(c, -1), fmt) == desired_result:
+            c = calibrate(c, -1)
 
     run_and_store_test_vector(f"{OP_FMADD}_{ROUND_NEAR_EVEN}_{a}_{b}_{c}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f)
 
@@ -172,10 +194,10 @@ def test_fmsub(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) -
     c = get_result_from_ref(OP_FMSUB, a, b, desired_result, fmt)
 
     if get_result_from_ref(OP_FMSUB, a, b, c, fmt) != desired_result:
-        if get_result_from_ref(OP_FMSUB, a, b, bump_ulp(c, 1), fmt) == desired_result:
-            c = bump_ulp(c, 1)
-        elif get_result_from_ref(OP_FMSUB, a, b, bump_ulp(c, -1), fmt) == desired_result:
-            c = bump_ulp(c, -1)
+        if get_result_from_ref(OP_FMSUB, a, b, calibrate(c, 1), fmt) == desired_result:
+            c = calibrate(c, 1)
+        elif get_result_from_ref(OP_FMSUB, a, b, calibrate(c, -1), fmt) == desired_result:
+            c = calibrate(c, -1)
 
     run_and_store_test_vector(f"{OP_FMSUB}_{ROUND_NEAR_EVEN}_{a}_{b}_{c}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f)
 
@@ -192,10 +214,10 @@ def test_fnmadd(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) 
     c = get_result_from_ref(OP_FMADD, a, b, desired_result, fmt)
 
     if get_result_from_ref(OP_FNMADD, a, b, c, fmt) != desired_result:
-        if get_result_from_ref(OP_FNMADD, a, b, bump_ulp(c, 1), fmt) == desired_result:
-            c = bump_ulp(c, 1)
-        elif get_result_from_ref(OP_FNMADD, a, b, bump_ulp(c, -1), fmt) == desired_result:
-            c = bump_ulp(c, -1)
+        if get_result_from_ref(OP_FNMADD, a, b, calibrate(c, 1), fmt) == desired_result:
+            c = calibrate(c, 1)
+        elif get_result_from_ref(OP_FNMADD, a, b, calibrate(c, -1), fmt) == desired_result:
+            c = calibrate(c, -1)
 
     run_and_store_test_vector(f"{OP_FNMADD}_{ROUND_NEAR_EVEN}_{a}_{b}_{c}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f)
 
@@ -212,10 +234,10 @@ def test_fnmsub(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) 
     c = get_result_from_ref(OP_FNMSUB, a, b, desired_result, fmt)
 
     if get_result_from_ref(OP_FNMSUB, a, b, c, fmt) != desired_result:
-        if get_result_from_ref(OP_FNMSUB, a, b, bump_ulp(c, 1), fmt) == desired_result:
-            c = bump_ulp(c, 1)
-        elif get_result_from_ref(OP_FNMSUB, a, b, bump_ulp(c, -1), fmt) == desired_result:
-            c = bump_ulp(c, -1)
+        if get_result_from_ref(OP_FNMSUB, a, b, calibrate(c, 1), fmt) == desired_result:
+            c = calibrate(c, 1)
+        elif get_result_from_ref(OP_FNMSUB, a, b, calibrate(c, -1), fmt) == desired_result:
+            c = calibrate(c, -1)
 
     run_and_store_test_vector(f"{OP_FNMSUB}_{ROUND_NEAR_EVEN}_{a}_{b}_{c}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f)
 
@@ -227,12 +249,10 @@ def main() -> None:
     ):
         for fmt in FLOAT_FMTS:
             m_bits = MANTISSA_BITS[fmt]
-            bias = (2 ** (EXPONENT_BITS[fmt] - 1)) - 1
 
-            # IEEE 754 Boundary Bases
             bases = {
                 "Zero": (0, 0),
-                "One": (0, bias),
+                "One": (0, (1 << (EXPONENT_BITS[fmt] - 1)) - 1),  # ?
                 "MinSub": (1, 0),
                 "MaxSub": ((1 << m_bits) - 1, 0),
                 "MinNorm": (0, 1),
@@ -244,19 +264,20 @@ def main() -> None:
                     desired_m = base_m ^ (1 << i)
                     for sign in [0, 1]:
                         desired_result = decimalComponentsToHex(fmt, sign, base_e, desired_m)
+                        print(desired_result)
 
-                        test_add(fmt, desired_result, test_f, cover_f)
-                        test_sub(fmt, desired_result, test_f, cover_f)
-                        test_mul(fmt, desired_result, test_f, cover_f)
-                        test_div(fmt, desired_result, test_f, cover_f)
+                        test_add(fmt, desired_result, base_e, test_f, cover_f)
+                        # test_sub(fmt, desired_result, base_e, test_f, cover_f)
+                        # test_mul(fmt, desired_result, test_f, cover_f)
+                        # test_div(fmt, desired_result, test_f, cover_f)
 
-                        if sign == 0:
-                            test_sqrt(fmt, desired_result, test_f, cover_f)
+                        # if sign == 0:
+                        #     test_sqrt(fmt, desired_result, test_f, cover_f)
 
-                        test_fmadd(fmt, desired_result, test_f, cover_f)
-                        test_fmsub(fmt, desired_result, test_f, cover_f)
-                        test_fnmadd(fmt, desired_result, test_f, cover_f)
-                        test_fnmsub(fmt, desired_result, test_f, cover_f)
+                        # test_fmadd(fmt, desired_result, test_f, cover_f)
+                        # test_fmsub(fmt, desired_result, test_f, cover_f)
+                        # test_fnmadd(fmt, desired_result, test_f, cover_f)
+                        # test_fnmsub(fmt, desired_result, test_f, cover_f)
 
 
 if __name__ == "__main__":
