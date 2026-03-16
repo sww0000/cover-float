@@ -33,11 +33,11 @@ covergroup B3_cg (virtual coverfloat_interface CFI);
         bins neg = {1};
     }
 
-    interm_sign: coverpoint CFI.intermS {
-        type_option.weight = 0;
-        bins pos = {0};
-        bins neg = {1};
-    }
+    // interm_sign: coverpoint CFI.intermS {
+    //     type_option.weight = 0;
+    //     bins pos = {0};
+    //     bins neg = {1};
+    // }
 
 
     F16_LSB:   coverpoint CFI.intermM[INTERM_M_BITS - F16_M_BITS     ] {
@@ -55,16 +55,16 @@ covergroup B3_cg (virtual coverfloat_interface CFI);
     BF16_LSB:  coverpoint CFI.intermM[INTERM_M_BITS - BF16_M_BITS    ] {
         type_option.weight = 0;
     }
-    int_LSB:   coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_INT     ] {
+    int_LSB:   coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_INT + 1 ] {
         type_option.weight = 0;
     }
-    uint_LSB:  coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_INT - 1 ] {
+    uint_LSB:  coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_INT     ] {
         type_option.weight = 0;
     }
-    long_LSB:  coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_LONG    ] {
+    long_LSB:  coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_LONG + 1 ] {
         type_option.weight = 0;
     }
-    ulong_LSB: coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_LONG - 1] {
+    ulong_LSB: coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_LONG     ] {
         type_option.weight = 0;
     }
 
@@ -84,16 +84,16 @@ covergroup B3_cg (virtual coverfloat_interface CFI);
     BF16_guard: coverpoint CFI.intermM[INTERM_M_BITS - BF16_M_BITS - 1] {
         type_option.weight = 0;
     }
-    int_guard:  coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_INT - 1 ] {
+    int_guard:  coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_INT     ] {
         type_option.weight = 0;
     }
-    uint_guard: coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_INT - 2 ] {
+    uint_guard: coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_INT - 1 ] {
         type_option.weight = 0;
     }
-    long_guard: coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_LONG - 1] {
+    long_guard: coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_LONG    ] {
         type_option.weight = 0;
     }
-    ulong_guard: coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_LONG - 2] {
+    ulong_guard: coverpoint CFI.intermM[INTERM_M_BITS - SIZEOF_LONG - 1] {
         type_option.weight = 0;
     }
 
@@ -263,12 +263,12 @@ covergroup B3_cg (virtual coverfloat_interface CFI);
 
     // main coverpoints
 
-    B3_int_convert:  cross FP_convert_ops, rounding_mode_all, interm_sign,  int_LSB,  int_guard,  int_sticky, FP_convert_fmt,  int_result_fmt;
-    B3_uint_convert: cross FP_convert_ops, rounding_mode_all, interm_sign, uint_LSB, uint_guard, uint_sticky, FP_convert_fmt, uint_result_fmt;
+    B3_int_convert:  cross FP_convert_ops, rounding_mode_all,  int_LSB,  int_guard,  int_sticky, FP_convert_fmt,  int_result_fmt;
+    B3_uint_convert: cross FP_convert_ops, rounding_mode_all, uint_LSB, uint_guard, uint_sticky, FP_convert_fmt, uint_result_fmt;
 
     `ifdef COVER_LONG
-    B3_long_convert:  cross FP_convert_ops, rounding_mode_all, interm_sign,  long_LSB,  int_guard,  long_sticky, FP_convert_fmt,  long_result_fmt;
-    B3_ulong_convert: cross FP_convert_ops, rounding_mode_all, interm_sign, ulong_LSB, uint_guard, ulong_sticky, FP_convert_fmt, ulong_result_fmt;
+        B3_long_convert:  cross FP_convert_ops, rounding_mode_all,  long_LSB,  int_guard,  long_sticky, FP_convert_fmt,  long_result_fmt;
+        B3_ulong_convert: cross FP_convert_ops, rounding_mode_all, ulong_LSB, uint_guard, ulong_sticky, FP_convert_fmt, ulong_result_fmt;
     `endif // COVER_LONG
 
     `ifdef COVER_F32
@@ -376,18 +376,18 @@ covergroup B3_cg (virtual coverfloat_interface CFI);
 
             `ifdef COVER_F16
                 ignore_bins widen_f16_to_f128 = binsof(FP_int_convert_fmt.fmt_half);
-            `endif // COVER_F64
+            `endif // COVER_F16
 
             `ifdef COVER_BF16
                 ignore_bins widen_bf16_to_f128 = binsof(FP_int_convert_fmt.fmt_bf16);
-            `endif // COVER_F64
+            `endif // COVER_BF16
 
             `ifdef COVER_F32
                 ignore_bins widen_f32_to_f128 = binsof(FP_int_convert_fmt.fmt_single);
-            `endif // COVER_F64
+            `endif // COVER_F32
 
             `ifdef COVER_F64
-                ignore_bins widen_f64_to_f128 = binsof(FP_int_convert_fmt.fmt_single);
+                ignore_bins widen_f64_to_f128 = binsof(FP_int_convert_fmt.fmt_double);
             `endif // COVER_F64
         }
     `endif // COVER_F128
