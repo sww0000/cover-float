@@ -33,7 +33,7 @@ Test all combinations of the sign, the significand's Least Significant Bit (LSB)
 
 == Background
 
-Floating point values are rounded after an operation according to a combination of the LSB, Guard, and Sticky Bits. Each of the IEEE754 rounding modes has a different behavior depending on the combination of these bits that results.
+Floating point values are rounded after an operation according to a combination of the Sign, LSB, Guard, and Sticky Bits. Each of the IEEE754 rounding modes has a different behavior depending on the combination of these bits that results.
 
 To verify that all rounding modes are implemented correctly, we must check all combinations of these rounding bits for all operations as rounding hardware may differ on a by-operation basis.
 

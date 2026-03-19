@@ -17,8 +17,6 @@ SRC3_OPS = [
     common.OP_FNMSUB,
 ]
 
-TESTING = False
-
 
 def generate_float(sign: int, exponent: int, mantissa: int, fmt: str) -> int:
     exponent += common.BIAS[fmt]
@@ -217,52 +215,6 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 tv = generate_test_vector(op, in1, in2, in3, fmt, fmt, mode)
                 result = run_test_vector(tv)
 
-                if TESTING:
-                    # These are very useful things to use when we test coverfloat and softfloat,
-                    # but not so necessary otherwise
-                    negIn3 = generate_float(signC ^ 1, expC - common.BIAS[fmt], sticky_bits, fmt)
-                    fake_tv = generate_test_vector(op, in1, in2, 0, fmt, fmt, mode)
-                    fake_tv_2 = generate_test_vector(common.OP_MUL, in1, in2, 0, fmt, fmt, mode)
-                    fake_tv_3 = generate_test_vector(op, in1, in2, negIn3, fmt, fmt, mode)
-                    fake_result = run_test_vector(fake_tv)
-                    fake_result_2 = run_test_vector(fake_tv_2)
-                    fake_result_3 = run_test_vector(fake_tv_3)
-
-                    _sig_1 = bin(int(fake_result.split("_")[-1], 16))[2:]
-                    _sig_2 = bin(int(fake_result_2.split("_")[-1], 16))[2:]
-                    sig_3 = bin(int("1" + fake_result_3.split("_")[-1], 16))[2:][1:]
-
-                    expected_sig3 = bin(sigProd - ((1 << common.MANTISSA_BITS[fmt]) + sticky_bits))[2:]
-                    expected_sig3 = expected_sig3[1:]
-                    if not (
-                        sig_3.startswith(expected_sig3) or (fmt == common.FMT_QUAD and expected_sig3.startswith(sig_3))
-                    ):
-                        breakpoint()
-
-                    shiftAmt = len(bin(sigProd)[2:]) - 1 - common.MANTISSA_BITS[fmt]
-                    shiftedSigProd = sigProd >> shiftAmt
-                    shiftedSigProd &= (1 << common.MANTISSA_BITS[fmt]) - 1
-                    in4 = generate_float(signA ^ signB ^ 1, expProd - common.BIAS[fmt], shiftedSigProd, fmt)
-                    tv_4 = generate_test_vector(common.OP_FMADD, in1, in2, in4, fmt, fmt, mode)
-                    out_4 = run_test_vector(tv_4)
-
-                    sig_4 = bin(int("1" + out_4.split("_")[-1], 16))[2:][1:]
-                    _first_digit = int(out_4.split("_")[-1][0], 16)
-                    expected_sig4 = sigProd - (((1 << common.MANTISSA_BITS[fmt]) + shiftedSigProd) << shiftAmt)
-
-                    if fmt != common.FMT_QUAD:
-                        is_subnormal = int(out_4.split("_")[-2], 16) <= 0
-                        if not sig_4.startswith(bin(expected_sig4)[2:][1:]) and not is_subnormal:
-                            breakpoint()
-
-                    result_float = int(result.split("_")[-6], 16)
-                    result_float >>= common.MANTISSA_BITS[fmt]
-                    result_float &= (1 << common.EXPONENT_BITS[fmt]) - 1
-                    inter_exp = int(result.split("_")[-2], 16)
-
-                    if expProd != inter_exp and not (fmt == common.FMT_BF16 and abs(expProd - inter_exp) <= 1):
-                        breakpoint()
-
                 rounding = extract_rounding_info(result)
 
                 if rounding["Sticky"] != 0:
@@ -337,7 +289,7 @@ def write_add_sub_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 else:
                     print(
                         f"AddSub test generation failed: op={op}, target={target}, last_digits={last_digits},"
-                        "A={A}, B={B}"
+                        f"A={A}, B={B}"
                     )
 
 
@@ -544,7 +496,7 @@ def write_div_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
             if sig_quotient * sig2 != sig1_64:
                 print(
                     f"Failed to generate exact division result, please investigate: target={target} K={K},"
-                    "odd_factors={odd_factors}, sig1={sig1:x}, sig2={sig2:x}"
+                    f"odd_factors={odd_factors}, sig1={sig1:x}, sig2={sig2:x}"
                 )
                 continue
 
@@ -582,7 +534,7 @@ def write_div_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 print(info, target)
                 print(
                     f"Failed to generate exact division result, please investigate: target={target}, K={K},"
-                    "odd_factors={odd_factors}, sig1={sig1:x}, sig2={sig2:x}"
+                    f"odd_factors={odd_factors}, sig1={sig1:x}, sig2={sig2:x}"
                 )
             else:
                 goals.remove(info)
