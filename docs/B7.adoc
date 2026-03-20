@@ -1,0 +1,106 @@
+= Floating Point Model Documentation
+:toc:
+:toclevels: 3
+:sectnums:
+:stem: latexmath
+
+== B7 Sticky Bit Calculation
+
+Aharoni et al.
+
+=== Description
+
+This model checks that the sticky bit is calculated correctly in each of the following cases (for every possible combination in the table). The Guard bit should be always 0, and the sign positive, so that miscalculation of the sticky bit will alter the final result.  This model tests every possible value for a shift between the input operands.
+
+[cols="1",options="header"]
+|===
+| Mask on Extra Bits
+
+| 1000...000
+
+| 0100...000
+
+| 0010...000
+
+| ...
+
+| 0000...010
+
+| 0000...001
+
+|===
+
+
+*Number of tests:* 1E6
+
+*Precisions Supported:* `BF_16`, `FP_16`, `FP_32`, `FP_64`, `FP_128`
+
+*Operations Supported:* Add, Subtract, Mul, FMA (all flavors), Converts
+
+*Rounding Mode:* Positive Infinity (Round Max)
+
+== Implementation
+
+=== Definitions
+
+`nf`:: The number of bits in a float's mantissa
+`extra bits`:: Every bit past the LSB of a float in an intermediate result
+
+== Background
+
+These tests ensure that the sticky bit is calculated correctly for every (reasonably) possible bit in the extra bits. This is important to a floating point unit because the extra bits in a rounding result all matter for correctly calculating the rounded result, so we must test that each bit works in isolation.
+
+== General Procedure
+
+The general goal for these tests is to do something similar to the B3 sticky = 0 cases where we either shift operands so that we get the desired extra bits, or just choose significands so that it ends up with a carefully structured result satisfying the condition. For the most part, we choose significands that are random in the bits that do not matter, but give the desired structure when it does matter. This means that multiplication exponents are randomized as much as possible, and addition significands are randomized when it does not matter.
+
+== Test Procedure
+
+=== Add Tests
+
+These tests are simple because the only way to get extra bits in floating point addition is to have misaligned significands. We control the exponents so that the exact amount of desired overhang is achieved. As much as possible, we also randomize how long the overhang is between significands, so that we do not have the last bit of the smaller float contributing to the sticky bit every time.
+
+This means that we have:
+- ExpA: Random
+- Shift Amount: Random Int between the target extra bit and `nf`
+- ExpB: ExpA - Shift Amount
+
+We then set any bits that contribute to the sticky to a pattern that generates the target extra bit in both effective addition and effective subtraction.
+
+=== Mul Tests
+
+For multiplication, we generate a result of the form U2.2nf, and either the last nf or the last nf+1 bits are the rounding bits. This means that the extra-bits are just the product mod (2^(nf + 1)). By choosing a random odd first significand, we have an inverse mod 2^(nf + 1), and with enough luck (about a 1/4 chance), we will generate a second significand of the correct size, by solving
+
+[stem]
+++++
+a * b \equiv target\_extra\_bits \pmod{2^{nf+1}}
+++++
+
+Due to the modular arithmetic properties, these significands will work for any desired value of extra_bits. We also pay attention to whether or not there was a shift to normalize the multiplication result back to a format with one leading digit as that could impact sticky calculation as well.
+
+=== FMA Tests
+
+For FMA, the sticky can be calculated in one of two ways: the addition is shifted into the extra bits from the multiplication, or the multiplication is shifted into the extra bits.
+
+The first case is much easier than the second. We can generate random multiplicands as in B3, then an addend can be generated for both effective multiplication and effective subtraction cases so that the target extra bit is generated.
+
+The second case requires multiplication results to be compliant, which introduces another layer of difficulty. Like the Mul case, most of the time we can solve this using modular arithmetic. Normally, we satisfy the equation for a given shift to the multiplicand
+
+[stem]
+++++
+a * b \equiv target\_extra\_bits \pmod{2^{nf + shift\_amount + 2}}
+++++
+
+However, if we take advantage of the fact that the structure of any target extra bits in effective addition and effective subtraction cases has trailing zeros, we can greatly reduce the base by reducing the target to something odd and subtracting the extraneous zeros from the exponent of the modulus. In most cases, this approach generates a working pair of multiplicands.
+
+If this approach does not work, for doubles and below, we can generate random numbers with the desired structure and see if they factor. This allows us to complete any remaining (double) cases. This also gives a verification of the computational infeasibility of some of the F16 and BF16 cases as with a small sample space this search is exhaustive.
+
+Currently, we are limited by the number of extra bits that softfloat provides, but within the constraints of the reference model, we get complete coverage of all possible extra bits.
+
+=== Converts
+
+Float to Float: In a narrowing conversion, we randomize the top bits and set the desired extra bits
+
+Float to Int: Similarly, we let the integral bits be randomized and place the extra bits pattern in the fractional bits.
+
+Int to Float: The first nf bits past the leading one are randomized, then the extra bits are placed immediately after.
