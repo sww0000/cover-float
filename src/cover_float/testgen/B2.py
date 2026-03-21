@@ -14,12 +14,12 @@ Operations: add, sub, multiply, fmadd, fmsub, fnmadd, fnmsub, sqrt
 Total test vectors generated: TBD
 
 For 32 b fp,
-Zero        00000000
-One         3F800000
-Minsubnorm  00000001
-Maxsubnorm  007FFFFF
-MinNorm     00800000
-MaxNrom     7F7FFFFF
+Zero        0.000000 P-126
+One         1.000000 P0
+Minsubnorm  0.000001 P-126
+Maxsubnorm  0.7FFFFF P-126
+MinNorm     1.000000 P-126 later ones have problem
+MaxNorm     1.7FFFFF P127 rounds to infinity
 """
 
 import random
@@ -60,38 +60,53 @@ def get_result_from_ref(op: str, a: str, b: str, c: str, fmt: str) -> str:
     return res_str.split("_")[6]
 
 
+# steps is only going to be 1 or -1. So this function add or subtract one to the original number
 def calibrate(hex_val: str, steps: int) -> str:
     """Adds or subtracts from the integer representation to step by ULPs."""
     val_int = int(hex_val, 16)
     return f"{(val_int + steps):032X}"
 
 
-def test_add(fmt: str, desired_result: str, base_e: int, test_f: TextIO, cover_f: TextIO) -> None:
+# TODO: looks like the last few minnorm results are a bit problematic.
+# TODO: further constraint the exponent range to make it possible for random generation of operand exponents
+# Workflow: take 23 bits for single precision, tthen randomly generates a exponents.
+# then use softfloat to get b by reversing the operation, and then add or subtract 1 from b until the result is as
+# expected.
+def test_add(fmt: str, desired_result: str, base_e: int, sign: int, test_f: TextIO, cover_f: TextIO) -> None:
     # We constrain the exponent of a to not be too far away from the base, so that there is enough precision
     # to produce a b different from a that would result in a very small value intead of 0.
     m_bits = MANTISSA_BITS[fmt]
-    max_exp = (1 << EXPONENT_BITS[fmt]) - 2
-    min_safe_exp = max(0, base_e - m_bits)
-    max_safe_exp = min(max_exp, base_e + m_bits)
 
-    a_exp = random.randint(min_safe_exp, max_safe_exp)
-    # a_exp = base_e
+    a_exp = base_e  # set a_exp to base_e because since when adding and subtracting numbers with different exponents,
+    # the exponents shift, and the loss of precision cannot be fully compensated with just adding or subtracting 1.
+
+    # for maxnorm, when the desired result is positive, the P127 operand must be positive, because if it is negative
+    # the other operand will need to be bigger than the max allowed number, which will round to positive infinity
+    # when the desired result is negative, the P127 operand must be negative for the same reason.
+    if base_e == ((1 << EXPONENT_BITS[fmt]) - 2):
+        if sign == 0:
+            a = decimalComponentsToHex(fmt, 0, a_exp, random.getrandbits(m_bits))
+            b = get_result_from_ref(OP_SUB, desired_result, a, "0" * 32, fmt)
+            run_and_store_test_vector(
+                f"{OP_ADD}_{ROUND_NEAR_EVEN}_{a}_{b}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f
+            )
+        else:
+            a = decimalComponentsToHex(fmt, 1, a_exp, random.getrandbits(m_bits))
+            b = get_result_from_ref(OP_SUB, desired_result, a, "0" * 32, fmt)
+            run_and_store_test_vector(
+                f"{OP_ADD}_{ROUND_NEAR_EVEN}_{a}_{b}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f
+            )
+        return
+
     a = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(m_bits))
-
     b = get_result_from_ref(OP_SUB, desired_result, a, "0" * 32, fmt)
-
-    ans = get_result_from_ref(OP_ADD, a, b, "0" * 32, fmt)
-    if ans < desired_result:
-        b = calibrate(b, 1)
-    elif ans > desired_result:
-        b = calibrate(b, -1)
 
     run_and_store_test_vector(
         f"{OP_ADD}_{ROUND_NEAR_EVEN}_{a}_{b}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f
     )
 
 
-def test_sub(fmt: str, desired_result: str, base_e: int, test_f: TextIO, cover_f: TextIO) -> None:
+def test_sub(fmt: str, desired_result: str, base_e: int, sign: int, test_f: TextIO, cover_f: TextIO) -> None:
     m_bits = MANTISSA_BITS[fmt]
     max_exp = (1 << EXPONENT_BITS[fmt]) - 2
     min_safe_exp = max(0, base_e - m_bits)
@@ -100,7 +115,7 @@ def test_sub(fmt: str, desired_result: str, base_e: int, test_f: TextIO, cover_f
     a_exp = random.randint(min_safe_exp, max_safe_exp)
     a = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(MANTISSA_BITS[fmt]))
 
-    # a - b = d  =>  b = a - d
+    # a - b = d  ->  b = a - d
     b = get_result_from_ref(OP_SUB, a, desired_result, "0" * 32, fmt)
     ans = get_result_from_ref(OP_SUB, a, b, "0" * 32, fmt)
     if ans < desired_result:
@@ -141,7 +156,7 @@ def test_mul(fmt: str, desired_result: str, base_e: int, test_f: TextIO, cover_f
     )
 
 
-def test_div(fmt: str, desired_result: str, test_f: TextIO, cover_f: TextIO) -> None:
+def test_div(fmt: str, desired_result: str, base_e: int, test_f: TextIO, cover_f: TextIO) -> None:
     max_exp = (1 << EXPONENT_BITS[fmt]) - 2
     b_exp = random.randint(0, max_exp)
     b = decimalComponentsToHex(fmt, random.randint(0, 1), b_exp, random.getrandbits(MANTISSA_BITS[fmt]))
@@ -276,10 +291,10 @@ def main() -> None:
                     for sign in [0, 1]:
                         desired_result = decimalComponentsToHex(fmt, sign, base_e, desired_m)
 
-                        # test_add(fmt, desired_result, base_e, test_f, cover_f)
-                        # test_sub(fmt, desired_result, base_e, test_f, cover_f)
-                        test_mul(fmt, desired_result, base_e, test_f, cover_f)
-                        # test_div(fmt, desired_result, test_f, cover_f)
+                        test_add(fmt, desired_result, base_e, sign, test_f, cover_f)
+                        # test_sub(fmt, desired_result, base_e, sign, test_f, cover_f)
+                        # test_mul(fmt, desired_result, base_e, test_f, cover_f)
+                        # test_div(fmt, desired_result, base_e, test_f, cover_f)
 
                         # if sign == 0:
                         #     test_sqrt(fmt, desired_result, test_f, cover_f)
