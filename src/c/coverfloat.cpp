@@ -101,13 +101,13 @@ uint128_t parse_hex_128(const char *hex) {
 }
 
 int reference_model(
-    const uint32_t *op,
-    const uint8_t *rm,
+    const uint32_t op,
+    const uint8_t rm,
     const mp::uint128_t &a,
     const mp::uint128_t &b,
     const mp::uint128_t &c,
-    const uint8_t *operandFmt,
-    const uint8_t *resultFmt,
+    const uint8_t operandFmt,
+    const uint8_t resultFmt,
 
     mp::uint128_t &result,
     uint8_t *flags,
@@ -121,14 +121,14 @@ int reference_model(
     softfloat_clearIntermResults();
 
     // set rounding mode
-    softFloat_setRoundingMode(*rm);
+    softFloat_setRoundingMode(rm);
 
     // nested switch statements to call softfloat functions
 
-    switch (*op) {
+    switch (op) {
     case OP_ADD: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -179,7 +179,7 @@ int reference_model(
 
     case OP_SUB: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -231,7 +231,7 @@ int reference_model(
 
     case OP_MUL: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -289,7 +289,7 @@ int reference_model(
 
     case OP_DIV: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -341,7 +341,7 @@ int reference_model(
 
     case OP_REM: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -398,7 +398,7 @@ int reference_model(
 
     case OP_FEQ: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -451,7 +451,7 @@ int reference_model(
 
     case OP_FLT: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -504,7 +504,7 @@ int reference_model(
 
     case OP_FLE: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -557,7 +557,7 @@ int reference_model(
 
     case OP_MIN: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -610,7 +610,7 @@ int reference_model(
 
     case OP_MAX: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -663,7 +663,7 @@ int reference_model(
 
     case OP_FSGNJ: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -716,7 +716,7 @@ int reference_model(
 
     case OP_FSGNJN: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -769,7 +769,7 @@ int reference_model(
 
     case OP_FSGNJX: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -821,10 +821,10 @@ int reference_model(
     }
 
     case OP_CIF: {
-        switch (*resultFmt) {
+        switch (resultFmt) {
         case FMT_HALF: {
             float16_t out;
-            switch (*operandFmt) {
+            switch (operandFmt) {
             case FMT_INT: {
                 uint32_t serialized_input = static_cast<uint32_t>(a);
                 int32_t input;
@@ -854,7 +854,7 @@ int reference_model(
                 break;
             }
             default: {
-                fprintf(stderr, "ERROR: int to float conversion with non-int operand format: %x\n", *operandFmt);
+                fprintf(stderr, "ERROR: int to float conversion with non-int operand format: %x\n", operandFmt);
                 return EXIT_FAILURE;
             }
             }
@@ -864,7 +864,7 @@ int reference_model(
         }
         case FMT_BF16: {
             float16_t out;
-            switch (*operandFmt) {
+            switch (operandFmt) {
             case FMT_INT: {
                 uint32_t serialized_input = static_cast<uint32_t>(a);
                 int32_t input;
@@ -896,7 +896,7 @@ int reference_model(
             //     break;
             // }
             default: {
-                fprintf(stderr, "ERROR: int to float conversion with unsupported operand format: %x\n", *operandFmt);
+                fprintf(stderr, "ERROR: int to float conversion with unsupported operand format: %x\n", operandFmt);
                 return EXIT_FAILURE;
             }
             }
@@ -906,7 +906,7 @@ int reference_model(
         }
         case FMT_SINGLE: {
             float32_t out;
-            switch (*operandFmt) {
+            switch (operandFmt) {
             case FMT_INT: {
                 uint32_t serialized_input = static_cast<uint32_t>(a);
                 int32_t input;
@@ -936,7 +936,7 @@ int reference_model(
                 break;
             }
             default: {
-                fprintf(stderr, "ERROR: int to float conversion with non-int operand format: %x\n", *operandFmt);
+                fprintf(stderr, "ERROR: int to float conversion with non-int operand format: %x\n", operandFmt);
                 return EXIT_FAILURE;
             }
             }
@@ -946,7 +946,7 @@ int reference_model(
         }
         case FMT_DOUBLE: {
             float64_t out;
-            switch (*operandFmt) {
+            switch (operandFmt) {
             case FMT_INT: {
                 uint32_t serialized_input = static_cast<uint32_t>(a);
                 int32_t input;
@@ -976,7 +976,7 @@ int reference_model(
                 break;
             }
             default: {
-                fprintf(stderr, "ERROR: int to float conversion with non-int operand format: %x\n", *operandFmt);
+                fprintf(stderr, "ERROR: int to float conversion with non-int operand format: %x\n", operandFmt);
                 return EXIT_FAILURE;
             }
             }
@@ -986,7 +986,7 @@ int reference_model(
         }
         case FMT_QUAD: {
             float128_t out;
-            switch (*operandFmt) {
+            switch (operandFmt) {
             case FMT_INT: {
                 uint32_t serialized_input = static_cast<uint32_t>(a);
                 int32_t input;
@@ -1016,7 +1016,7 @@ int reference_model(
                 break;
             }
             default: {
-                fprintf(stderr, "ERROR: int to float conversion with non-int operand format: %x\n", *operandFmt);
+                fprintf(stderr, "ERROR: int to float conversion with non-int operand format: %x\n", operandFmt);
                 return EXIT_FAILURE;
             }
             }
@@ -1025,7 +1025,7 @@ int reference_model(
             break;
         }
         default: {
-            fprintf(stderr, "ERROR: int to float conversion called with unsupported result format: %x\n", *resultFmt);
+            fprintf(stderr, "ERROR: int to float conversion called with unsupported result format: %x\n", resultFmt);
             return EXIT_FAILURE;
         }
         }
@@ -1034,26 +1034,26 @@ int reference_model(
     }
 
     case OP_CFI: {
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af;
             // TODO: maybe sign extend...
             MP_TO_FLOAT32(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_INT: {
-                result = signed_to_unsigned(f32_to_i32(af, *rm, true));
+                result = signed_to_unsigned(f32_to_i32(af, rm, true));
                 break;
             }
             case FMT_UINT: {
-                result = f32_to_ui32(af, *rm, true);
+                result = f32_to_ui32(af, rm, true);
                 break;
             }
             case FMT_LONG: {
-                result = signed_to_unsigned(f32_to_i64(af, *rm, true));
+                result = signed_to_unsigned(f32_to_i64(af, rm, true));
                 break;
             }
             case FMT_ULONG: {
-                result = f32_to_ui64(af, *rm, true);
+                result = f32_to_ui64(af, rm, true);
                 break;
             }
             default: {
@@ -1068,21 +1068,21 @@ int reference_model(
         case FMT_DOUBLE: {
             float64_t af;
             MP_TO_FLOAT64(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_INT: {
-                result = signed_to_unsigned(f64_to_i32(af, *rm, true));
+                result = signed_to_unsigned(f64_to_i32(af, rm, true));
                 break;
             }
             case FMT_UINT: {
-                result = f64_to_ui32(af, *rm, true);
+                result = f64_to_ui32(af, rm, true);
                 break;
             }
             case FMT_LONG: {
-                result = signed_to_unsigned(f64_to_i64(af, *rm, true));
+                result = signed_to_unsigned(f64_to_i64(af, rm, true));
                 break;
             }
             case FMT_ULONG: {
-                result = f64_to_ui64(af, *rm, true);
+                result = f64_to_ui64(af, rm, true);
                 break;
             }
             default: {
@@ -1097,21 +1097,21 @@ int reference_model(
         case FMT_QUAD: {
             float128_t af;
             MP_TO_FLOAT128(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_INT: {
-                result = signed_to_unsigned(f128_to_i32(af, *rm, true));
+                result = signed_to_unsigned(f128_to_i32(af, rm, true));
                 break;
             }
             case FMT_UINT: {
-                result = f128_to_ui32(af, *rm, true);
+                result = f128_to_ui32(af, rm, true);
                 break;
             }
             case FMT_LONG: {
-                result = signed_to_unsigned(f128_to_i64(af, *rm, true));
+                result = signed_to_unsigned(f128_to_i64(af, rm, true));
                 break;
             }
             case FMT_ULONG: {
-                result = f128_to_ui64(af, *rm, true);
+                result = f128_to_ui64(af, rm, true);
                 break;
             }
             default: {
@@ -1126,21 +1126,21 @@ int reference_model(
         case FMT_HALF: {
             float16_t af;
             MP_TO_FLOAT16(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_INT: {
-                result = signed_to_unsigned(f16_to_i32(af, *rm, true));
+                result = signed_to_unsigned(f16_to_i32(af, rm, true));
                 break;
             }
             case FMT_UINT: {
-                result = f16_to_ui32(af, *rm, true);
+                result = f16_to_ui32(af, rm, true);
                 break;
             }
             case FMT_LONG: {
-                result = signed_to_unsigned(f16_to_i64(af, *rm, true));
+                result = signed_to_unsigned(f16_to_i64(af, rm, true));
                 break;
             }
             case FMT_ULONG: {
-                result = f16_to_ui64(af, *rm, true);
+                result = f16_to_ui64(af, rm, true);
                 break;
             }
             default: {
@@ -1155,21 +1155,21 @@ int reference_model(
         case FMT_BF16: {
             float16_t af;
             MP_TO_FLOAT16(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_INT: {
-                result = signed_to_unsigned(bf16_to_i32(af, *rm, true));
+                result = signed_to_unsigned(bf16_to_i32(af, rm, true));
                 break;
             }
             case FMT_UINT: {
-                result = bf16_to_ui32(af, *rm, true);
+                result = bf16_to_ui32(af, rm, true);
                 break;
             }
             case FMT_LONG: {
-                result = f32_to_i64(bf16_to_f32(af), *rm, true);
+                result = f32_to_i64(bf16_to_f32(af), rm, true);
                 break;
             }
             case FMT_ULONG: {
-                result = f32_to_ui64(bf16_to_f32(af), *rm, true);
+                result = f32_to_ui64(bf16_to_f32(af), rm, true);
                 break;
             }
             default: {
@@ -1191,11 +1191,11 @@ int reference_model(
     /* TODO: float to float instructions */
     case OP_CFF: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af;
             MP_TO_FLOAT32(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_HALF: {
                 float16_t resultf = f32_to_f16(af);
                 FLOAT16_TO_MP(result, resultf);
@@ -1232,7 +1232,7 @@ int reference_model(
         case FMT_DOUBLE: {
             float64_t af;
             MP_TO_FLOAT64(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_HALF: {
                 float16_t resultf = f64_to_f16(af);
                 FLOAT16_TO_MP(result, resultf);
@@ -1269,7 +1269,7 @@ int reference_model(
         case FMT_QUAD: {
             float128_t af;
             MP_TO_FLOAT128(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_HALF: {
                 float16_t resultf = f128_to_f16(af);
                 FLOAT16_TO_MP(result, resultf);
@@ -1278,7 +1278,7 @@ int reference_model(
             case FMT_BF16: {
                 softFloat_setRoundingMode(softfloat_round_odd);
                 float32_t af_32 = f128_to_f32(af);
-                softFloat_setRoundingMode(*rm);
+                softFloat_setRoundingMode(rm);
 
                 bfloat16_t resultf = f32_to_bf16(af_32);
                 FLOAT16_TO_MP(result, resultf);
@@ -1310,7 +1310,7 @@ int reference_model(
         case FMT_HALF: {
             float16_t af;
             MP_TO_FLOAT16(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_HALF: {
                 fprintf(stderr, "ERROR: float to float conversion with the same operand and result format (half)\n");
                 return EXIT_FAILURE;
@@ -1347,7 +1347,7 @@ int reference_model(
         case FMT_BF16: {
             float16_t af;
             MP_TO_FLOAT16(af, a);
-            switch (*resultFmt) {
+            switch (resultFmt) {
             case FMT_HALF: {
                 float16_t resultf = f32_to_f16(bf16_to_f32(af));
                 FLOAT16_TO_MP(result, resultf);
@@ -1387,7 +1387,7 @@ int reference_model(
 
     case OP_SQRT: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, resultf;
             MP_TO_FLOAT32(af, a);
@@ -1434,7 +1434,7 @@ int reference_model(
 
     case OP_CLASS: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, resultf;
             MP_TO_FLOAT32(af, a);
@@ -1482,7 +1482,7 @@ int reference_model(
 
     case OP_FMADD: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, cf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -1539,7 +1539,7 @@ int reference_model(
 
     case OP_FMSUB: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, cf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -1601,7 +1601,7 @@ int reference_model(
 
     case OP_FNMADD: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, cf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -1668,7 +1668,7 @@ int reference_model(
 
     case OP_FNMSUB: {
 
-        switch (*operandFmt) {
+        switch (operandFmt) {
         case FMT_SINGLE: {
             float32_t af, bf, cf, resultf;
             MP_TO_FLOAT32(af, a);
@@ -1729,7 +1729,7 @@ int reference_model(
     }
 
     default: {
-        fprintf(stderr, "Unsupported Operation Called, OP: %x\n", *op);
+        fprintf(stderr, "Unsupported Operation Called, OP: %x\n", op);
         return EXIT_FAILURE;
     }
     }
@@ -1739,7 +1739,7 @@ int reference_model(
 
     if (intermResult->exp == 0 && intermResult->sig64 == 0) {
         // Then we need to extract an intermediate result from the result
-        switch (*resultFmt) {
+        switch (resultFmt) {
         case FMT_BF16: {
             uint64_t sig = static_cast<uint64_t>(fracBF16UI(result));
             uint32_t exp = expBF16UI(result);
@@ -1844,7 +1844,7 @@ int reference_model(
     }
 
     // 2
-    uint8_t shift_amount = (*resultFmt == FMT_QUAD) ? 16 : 2;
+    uint8_t shift_amount = (resultFmt == FMT_QUAD) ? 16 : 2;
     struct uint128 shifted_sig = softfloat_shortShiftLeft128(intermResult->sig64, intermResult->sig0, shift_amount);
 
     intermResult->sig64 = shifted_sig.v64;
@@ -1965,7 +1965,7 @@ std::string coverfloat_runtestvector(const std::string &input, bool suppress_err
 
     // Call reference model
 
-    int success = reference_model(&op, &rm, a, b, c, &opFmt, &resFmt, newRes, &newFlags, &intermRes);
+    int success = reference_model(op, rm, a, b, c, opFmt, resFmt, newRes, &newFlags, &intermRes);
 
     if (success == EXIT_FAILURE) {
         return "";
