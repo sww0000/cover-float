@@ -37,6 +37,7 @@ from cover_float.common.constants import (
     OP_FMADD,
     OP_FMSUB,
     OP_FNMADD,
+    OP_FNMSUB,
     OP_MUL,
     OP_SQRT,
     OP_SUB,
@@ -262,7 +263,8 @@ def test_fmadd(fmt: str, desired_result: str, base_e: int, maxnorm: bool, test_f
     # b_exp = random.randint(min_safe_exp, max_safe_exp)
     a = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(MANTISSA_BITS[fmt]))
     b = decimalComponentsToHex(fmt, random.randint(0, 1), b_exp, random.getrandbits(MANTISSA_BITS[fmt]))
-    c = get_result_from_ref(OP_FNMADD, a, b, desired_result, fmt)
+    c = get_result_from_ref(OP_FNMSUB, a, b, desired_result, fmt)
+    # a*b+c = desired result -> c = -(a*b-desired result)
 
     # if get_result_from_ref(OP_FMADD, a, b, c, fmt) != desired_result:
     #     if get_result_from_ref(OP_FMADD, a, b, calibrate(c, 1), fmt) == desired_result:
@@ -361,26 +363,33 @@ def test_fnmadd(fmt: str, desired_result: str, base_e: int, maxnorm: bool, test_
     run_and_store_test_vector(f"{OP_FNMADD}_{ROUND_NEAR_EVEN}_{a}_{b}_{c}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f)
 
 
-# def test_fnmsub(fmt: str, desired_result: str, base_e: int, maxnorm: bool, test_f: TextIO, cover_f: TextIO) -> None:
-#     max_exp = BIASED_EXP[fmt][1]  # 254
-#     bias = BIAS[fmt]  # 127
-#     m_bits = MANTISSA_BITS[fmt]
-#     a = decimalComponentsToHex(
-#         fmt, random.randint(0, 1), random.randint(0, max_exp), random.getrandbits(MANTISSA_BITS[fmt])
-#     )
-#     b = decimalComponentsToHex(
-#         fmt, random.randint(0, 1), random.randint(0, max_exp), random.getrandbits(MANTISSA_BITS[fmt])
-#     )
+def test_fnmsub(fmt: str, desired_result: str, base_e: int, maxnorm: bool, test_f: TextIO, cover_f: TextIO) -> None:
+    max_exp = BIASED_EXP[fmt][1]  # 254
+    bias = BIAS[fmt]  # 127
+    m_bits = MANTISSA_BITS[fmt]
+    # -a*b + c = desired_result -> c = a*b + desired_result
+    if maxnorm:
+        min_safe_exp = bias
+        max_safe_exp = max_exp
+        a_exp = random.randint(min_safe_exp, max_safe_exp)
+        b_exp = random.randint(max(0, max_exp - a_exp - m_bits), max_exp - a_exp)
+    else:
+        min_safe_exp = 1
+        max_safe_exp = bias
+        a_exp = random.randint(min_safe_exp, max_safe_exp)
+        b_exp = base_e - a_exp + bias
 
-#     c = get_result_from_ref(OP_FNMSUB, a, b, desired_result, fmt)
+    a = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(MANTISSA_BITS[fmt]))
+    b = decimalComponentsToHex(fmt, random.randint(0, 1), b_exp, random.getrandbits(MANTISSA_BITS[fmt]))
+    c = get_result_from_ref(OP_FMADD, a, b, desired_result, fmt)
 
-#     # if get_result_from_ref(OP_FNMSUB, a, b, c, fmt) != desired_result:
-#     #     if get_result_from_ref(OP_FNMSUB, a, b, calibrate(c, 1), fmt) == desired_result:
-#     #         c = calibrate(c, 1)
-#     #     elif get_result_from_ref(OP_FNMSUB, a, b, calibrate(c, -1), fmt) == desired_result:
-#     #         c = calibrate(c, -1)
+    # if get_result_from_ref(OP_FNMSUB, a, b, c, fmt) != desired_result:
+    #     if get_result_from_ref(OP_FNMSUB, a, b, calibrate(c, 1), fmt) == desired_result:
+    #         c = calibrate(c, 1)
+    #     elif get_result_from_ref(OP_FNMSUB, a, b, calibrate(c, -1), fmt) == desired_result:
+    #         c = calibrate(c, -1)
 
-#     run_and_store_test_vector(f"{OP_FNMSUB}_{ROUND_NEAR_EVEN}_{a}_{b}_{c}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f)
+    run_and_store_test_vector(f"{OP_FNMSUB}_{ROUND_NEAR_EVEN}_{a}_{b}_{c}_{fmt}_{32 * '0'}_{fmt}_00", test_f, cover_f)
 
 
 def main() -> None:
@@ -418,8 +427,8 @@ def main() -> None:
 
                         # test_fmadd(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
                         # test_fmsub(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
-                        test_fnmadd(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
-                        # test_fnmsub(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
+                        # test_fnmadd(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
+                        test_fnmsub(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
 
 
 if __name__ == "__main__":
