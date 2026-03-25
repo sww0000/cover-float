@@ -47,13 +47,6 @@ def get_result_from_ref(op: str, a: str, b: str, c: str, fmt: str) -> str:
     return res_str.split("_")[6]
 
 
-# steps is only going to be 1 or -1. So this function add or subtract one to the original number
-def calibrate(hex_val: str, steps: int) -> str:
-    """Adds or subtracts from the integer representation to step by ULPs."""
-    val_int = int(hex_val, 16)
-    return f"{(val_int + steps):032X}"
-
-
 # TODO: IDEA: restrain the difference between a_exp and b_exp to increase accuracy!!!! for ALL operations!!!!
 # TODO: IDEA: to calibrate, check whether the numerical part of the result and desired result are equal.
 # This is because the flag might set the difference.
