@@ -2,9 +2,9 @@ covergroup B2_cg (virtual coverfloat_interface CFI);
 
     option.per_instance = 0;
 
-    FP_result_ops: coverpoint CFI.op {
+    FP_arith_ops: coverpoint CFI.op {
         type_option.weight = 0;
-        `include "bins_templates/FP_result_op_bins.svh"
+        `include "bins_templates/arithmetic_op_bins.svh"
     }
 
     F32_sign: coverpoint CFI.result[31] {
@@ -343,48 +343,48 @@ covergroup B2_cg (virtual coverfloat_interface CFI);
 
     // main coverpoints
     `ifdef COVER_F32
-        B2_F32_near_zero       : cross FP_result_ops, F32_sign, F32_near_zero,       F32_result_fmt;
-        B2_F32_near_one        : cross FP_result_ops, F32_sign, F32_near_one,        F32_result_fmt;
-        B2_F32_near_minsubnorm : cross FP_result_ops, F32_sign, F32_near_minsubnorm, F32_result_fmt;
-        B2_F32_near_maxsubnorm : cross FP_result_ops, F32_sign, F32_near_maxsubnorm, F32_result_fmt;
-        B2_F32_near_minnorm    : cross FP_result_ops, F32_sign, F32_near_minnorm,    F32_result_fmt;
-        B2_F32_near_maxnorm    : cross FP_result_ops, F32_sign, F32_near_maxnorm,    F32_result_fmt;
+        B2_F32_near_zero       : cross FP_arith_ops, F32_sign, F32_near_zero,       F32_result_fmt;
+        B2_F32_near_one        : cross FP_arith_ops, F32_sign, F32_near_one,        F32_result_fmt;
+        B2_F32_near_minsubnorm : cross FP_arith_ops, F32_sign, F32_near_minsubnorm, F32_result_fmt;
+        B2_F32_near_maxsubnorm : cross FP_arith_ops, F32_sign, F32_near_maxsubnorm, F32_result_fmt;
+        B2_F32_near_minnorm    : cross FP_arith_ops, F32_sign, F32_near_minnorm,    F32_result_fmt;
+        B2_F32_near_maxnorm    : cross FP_arith_ops, F32_sign, F32_near_maxnorm,    F32_result_fmt;
     `endif // COVER_F32
 
     `ifdef COVER_F64
-        B2_F64_near_zero       : cross FP_result_ops, F64_sign, F64_near_zero,       F64_result_fmt;
-        B2_F64_near_one        : cross FP_result_ops, F64_sign, F64_near_one,        F64_result_fmt;
-        B2_F64_near_minsubnorm : cross FP_result_ops, F64_sign, F64_near_minsubnorm, F64_result_fmt;
-        B2_F64_near_maxsubnorm : cross FP_result_ops, F64_sign, F64_near_maxsubnorm, F64_result_fmt;
-        B2_F64_near_minnorm    : cross FP_result_ops, F64_sign, F64_near_minnorm,    F64_result_fmt;
-        B2_F64_near_maxnorm    : cross FP_result_ops, F64_sign, F64_near_maxnorm,    F64_result_fmt;
+        B2_F64_near_zero       : cross FP_arith_ops, F64_sign, F64_near_zero,       F64_result_fmt;
+        B2_F64_near_one        : cross FP_arith_ops, F64_sign, F64_near_one,        F64_result_fmt;
+        B2_F64_near_minsubnorm : cross FP_arith_ops, F64_sign, F64_near_minsubnorm, F64_result_fmt;
+        B2_F64_near_maxsubnorm : cross FP_arith_ops, F64_sign, F64_near_maxsubnorm, F64_result_fmt;
+        B2_F64_near_minnorm    : cross FP_arith_ops, F64_sign, F64_near_minnorm,    F64_result_fmt;
+        B2_F64_near_maxnorm    : cross FP_arith_ops, F64_sign, F64_near_maxnorm,    F64_result_fmt;
     `endif // COVER_F64
 
     `ifdef COVER_F16
-        B2_F16_near_zero       : cross FP_result_ops, F16_sign, F16_near_zero,       F16_result_fmt;
-        B2_F16_near_one        : cross FP_result_ops, F16_sign, F16_near_one,        F16_result_fmt;
-        B2_F16_near_minsubnorm : cross FP_result_ops, F16_sign, F16_near_minsubnorm, F16_result_fmt;
-        B2_F16_near_maxsubnorm : cross FP_result_ops, F16_sign, F16_near_maxsubnorm, F16_result_fmt;
-        B2_F16_near_minnorm    : cross FP_result_ops, F16_sign, F16_near_minnorm,    F16_result_fmt;
-        B2_F16_near_maxnorm    : cross FP_result_ops, F16_sign, F16_near_maxnorm,    F16_result_fmt;
+        B2_F16_near_zero       : cross FP_arith_ops, F16_sign, F16_near_zero,       F16_result_fmt;
+        B2_F16_near_one        : cross FP_arith_ops, F16_sign, F16_near_one,        F16_result_fmt;
+        B2_F16_near_minsubnorm : cross FP_arith_ops, F16_sign, F16_near_minsubnorm, F16_result_fmt;
+        B2_F16_near_maxsubnorm : cross FP_arith_ops, F16_sign, F16_near_maxsubnorm, F16_result_fmt;
+        B2_F16_near_minnorm    : cross FP_arith_ops, F16_sign, F16_near_minnorm,    F16_result_fmt;
+        B2_F16_near_maxnorm    : cross FP_arith_ops, F16_sign, F16_near_maxnorm,    F16_result_fmt;
     `endif // COVER_F16
 
     `ifdef COVER_BF16
-        B2_BF16_near_zero       : cross FP_result_ops, BF16_sign, BF16_near_zero,       BF16_result_fmt;
-        B2_BF16_near_one        : cross FP_result_ops, BF16_sign, BF16_near_one,        BF16_result_fmt;
-        B2_BF16_near_minsubnorm : cross FP_result_ops, BF16_sign, BF16_near_minsubnorm, BF16_result_fmt;
-        B2_BF16_near_maxsubnorm : cross FP_result_ops, BF16_sign, BF16_near_maxsubnorm, BF16_result_fmt;
-        B2_BF16_near_minnorm    : cross FP_result_ops, BF16_sign, BF16_near_minnorm,    BF16_result_fmt;
-        B2_BF16_near_maxnorm    : cross FP_result_ops, BF16_sign, BF16_near_maxnorm,    BF16_result_fmt;
+        B2_BF16_near_zero       : cross FP_arith_ops, BF16_sign, BF16_near_zero,       BF16_result_fmt;
+        B2_BF16_near_one        : cross FP_arith_ops, BF16_sign, BF16_near_one,        BF16_result_fmt;
+        B2_BF16_near_minsubnorm : cross FP_arith_ops, BF16_sign, BF16_near_minsubnorm, BF16_result_fmt;
+        B2_BF16_near_maxsubnorm : cross FP_arith_ops, BF16_sign, BF16_near_maxsubnorm, BF16_result_fmt;
+        B2_BF16_near_minnorm    : cross FP_arith_ops, BF16_sign, BF16_near_minnorm,    BF16_result_fmt;
+        B2_BF16_near_maxnorm    : cross FP_arith_ops, BF16_sign, BF16_near_maxnorm,    BF16_result_fmt;
     `endif // COVER_BF16
 
     `ifdef COVER_F128
-        B2_F128_near_zero       : cross FP_result_ops, F128_sign, F128_near_zero,       F128_result_fmt;
-        B2_F128_near_one        : cross FP_result_ops, F128_sign, F128_near_one,        F128_result_fmt;
-        B2_F128_near_minsubnorm : cross FP_result_ops, F128_sign, F128_near_minsubnorm, F128_result_fmt;
-        B2_F128_near_maxsubnorm : cross FP_result_ops, F128_sign, F128_near_maxsubnorm, F128_result_fmt;
-        B2_F128_near_minnorm    : cross FP_result_ops, F128_sign, F128_near_minnorm,    F128_result_fmt;
-        B2_F128_near_maxnorm    : cross FP_result_ops, F128_sign, F128_near_maxnorm,    F128_result_fmt;
+        B2_F128_near_zero       : cross FP_arith_ops, F128_sign, F128_near_zero,       F128_result_fmt;
+        B2_F128_near_one        : cross FP_arith_ops, F128_sign, F128_near_one,        F128_result_fmt;
+        B2_F128_near_minsubnorm : cross FP_arith_ops, F128_sign, F128_near_minsubnorm, F128_result_fmt;
+        B2_F128_near_maxsubnorm : cross FP_arith_ops, F128_sign, F128_near_maxsubnorm, F128_result_fmt;
+        B2_F128_near_minnorm    : cross FP_arith_ops, F128_sign, F128_near_minnorm,    F128_result_fmt;
+        B2_F128_near_maxnorm    : cross FP_arith_ops, F128_sign, F128_near_maxnorm,    F128_result_fmt;
     `endif // COVER_F128
 
 
