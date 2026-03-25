@@ -1,0 +1,58 @@
+= Floating Point Model Documentation
+:toc:
+:toclevels: 3
+:sectnums:
+
+== B13
+
+Aharoni et al.
+
+=== Description
+
+This model tests all combinations of cancellation values as in model (B12), with all possible unbiased exponent values of subnormal results. This model has similarities to B12, but instead of testing normal, subnormal, and zero results in B12, B13 only test results that are subnormal. So B13 is a subset of B12, but sweeps the entire subnorm range.
+
+DEFINITION
+
+Operations: add, sub
+Total test vectors generated:
+
+
+== Background
+
+Subnormals are one of the hardest parts of FP hardware because:
+normalization breaks
+rounding behaves differently
+underflow logic is triggered
+precision is degraded
+
+B13 model is targeting bugs in:
+1. Alignment logic
+exponent shifting before subtraction
+2. Cancellation detection
+leading zero count
+3. Normalization
+shifting result left after cancellation
+4. Subnormal generation
+handling exponent = 0 correctly
+5. Rounding
+rounding in subnormal domain (very tricky)
+=== Design choices & Impossible cases
+1. d = +1 is impossible
+
+== General Procedure
+
+We iterate the operand exponent difference from the minimum exponent from -p to +1
+
+We have to separate different parts of the desired result because
+1. We need to toggle every bit of the mantissa only
+2. we need to iterate through positive and negative desired values
+
+addTest: check for maxnorm and constraints sign for maxnorm
+subTest: check for maxnorm and constraints sign for maxnorm
+mulTest: check for maxnorm to constraint operand exponents
+divTest: check for maxnorm to constraint operand exponents
+sqrtTest: nothing
+fmaddTest (a*b+c = desired result): check maxnorm to constraint operand exponents
+fmsubTest (a*b-c = desired result): check maxnorm to constraint operand exponents
+fnmaddTest (-a*b-c = desired result): check maxnorm to constraint operand exponents
+fnmsubTest (-a*b+c = desired result): check maxnorm to constraint operand exponents
