@@ -5,6 +5,8 @@ Created:        March 24, 2026
 Last Edited:    March 24, 2026
 """
 
+# TODO: Perhaps look into mpmath? Using that to generate b might help.
+
 import random
 from pathlib import Path
 from random import seed
@@ -54,9 +56,6 @@ def get_result_from_ref(op: str, a: str, b: str, c: str, fmt: str) -> str:
 
 # TODO: looks like the last few minnorm results are a bit inaccurate.
 # TODO: further constraint the exponent range to make it possible for random generation of operand exponents
-# Workflow: take 23 bits for single precision, tthen randomly generates a exponents.
-# then use softfloat to get b by reversing the operation, and then add or subtract 1 from b until the result is as
-# expected.
 def test_add(
     fmt: str, desired_result: str, base_e: int, maxnorm: bool, sign: int, test_f: TextIO, cover_f: TextIO
 ) -> None:
