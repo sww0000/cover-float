@@ -104,3 +104,55 @@ Float to Float: In a narrowing conversion, we randomize the top bits and set the
 Float to Int: Similarly, we let the integral bits be randomized and place the extra bits pattern in the fractional bits.
 
 Int to Float: The first nf bits past the leading one are randomized, then the extra bits are placed immediately after.
+
+== Test Count Breakdown
+
+Add/Sub: We generate stem:[2 * (nf - 1)] tests per precision, as there are stem:[nf - 1] possible sticky bits for us to set. Note that we cannot get stem:[nf] at that involves placing the leading one on the guard bit, which breaks the rules of this coverpoint
+
+This gives a total of 398 tests.
+
+Multiplication: We generate stem:[2*nf - 1] total tests per precision. With a shift, there are stem:[nf] sticky bits and without there are stem:[nf - 1].
+
+This gives a total of 403 tests.
+
+FMA: We generate at least stem:[32nf] tests per precision per operation. As we attempt to have both addends contributing to the operation, the number is generally higher. There are also 4 flavors of fma that are accounted for. Below is a list of precisions and how many tests are generated.
+
+[cols="2*", options="header"]
+|===
+| Precision | Tests
+| Half | 142
+| BF16 | 104
+| Single | 332
+| Double | 704
+| Quad | 1402
+|===
+
+This totals to 2684 tests.
+
+Converts: We generate stem:[nf - 1] for each CFI, the excess number of excess bits for each CFF, and the number of excess bits minus two for each CIF. Convert tests are only generated in the case of narrowing conversions, so a table below lists the number of conversions for each precision where the number of tests is non-trivial.
+
+CFF
+[cols="5*", options="header"]
+|===
+| To / From | Half | Single | Double | Quad
+| BF16 | 2 | 15 | 44 | 104
+| Half | 0 | 12 | 41 | 101
+| Single | 0 | 0 | 28 | 88
+| Double | 0 | 0 | 0 | 59
+|===
+
+CIF
+[cols="5*", options="header"]
+|===
+| To / From | int | long | uint | ulong
+| BF16 | 22 | 54 | 23 | 55
+| Half | 19 | 51 | 20 | 52
+| Single | 6 | 38 | 7 | 39
+| Double | 0 | 9 | 0 | 10
+|===
+
+This totals (with CFI) to 1695.
+
+=== Overall Test Count
+
+Each of these cases sum to a total of 5180 tests.
