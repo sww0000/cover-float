@@ -1,411 +1,280 @@
-# Created By: cover-float team
-#
-# B4. Overflow and Near Overflow
-#
-# From Aharoni et al. 2008:
-#
-#   This model creates a test-case for each of the following constraints on the
-#   intermediate results:
-#
-#   i.   All the numbers in the range [+MaxNorm - 3ulp, +MaxNorm + 3ulp]
-#   ii.  All the numbers in the range [-MaxNorm - 3ulp, -MaxNorm + 3ulp]
-#   iii. A random number that is larger than +MaxNorm + 3ulp
-#   iv.  A random number that is smaller than -MaxNorm - 3ulp
-#   v.   One number for every exponent in the range [MaxNorm.exp - 3, MaxNorm.exp + 3]
-#        for positive and negative numbers
-#
-# ---------------------------------------------------------------------------
-# Coverpoint analysis (B4.svh)
-# ---------------------------------------------------------------------------
-#
-# Three coverpoints per format, all crossed with
-#   FP_result_ops × rounding_mode_all(5 bins) × sign × result_fmt_gate:
-#
-# ── 1. F*_maxNorm_pm_3ulp ──────────────────────────────────────────────────
-# Samples: intermM[(INTERM_M_BITS - M) -: 3]  — the 3-bit {L, G, S} window
-# Guard:   intermX == F*_MAXNORM_EXP   (biased MaxNorm exponent)
-#       AND intermM[(INTERM_M_BITS-1) -: (M-1)] == '1   (top M-1 fractional bits)
-# Bins:    LGS ∈ {001 .. 111}  (7 bins, 000 excluded)
-#
-# intermM layout: after stripping the implicit leading-1 and left-aligning,
-# bit 191 is the MSB of the fractional part. For a format with M bits:
-#   intermM[191 : 192-M]  = the M fractional mantissa bits
-#   intermM[192-M]        = L  (LSB of the M-bit mantissa)
-#   intermM[191-M]        = G  (first sub-ulp bit — the guard bit)
-#   intermM[190-M]        = S  (second sub-ulp bit — the sticky bit)
-#
-# The coverpoint samples {L, G, S} = intermM[192-M : 190-M].
-# The guard requires all of intermM[191 : 193-M] (the top M-1 bits) to be 1.
-#
-# Construction — what sets {L, G, S}:
-#   For FADD(A, B) the infinite-precision intermediate is A + B exactly.
-#   B = lgs * 2^(ulp_exp - 3)  (sub-ulp, so the intermediate stays at the same
-#   biased exponent as A and doesn't shift the mantissa window).
-#
-#   The lgs integer's bits map to intermM as follows:
-#     lgs bit 2  →  G  (position 191-M)
-#     lgs bit 1  →  S  (position 190-M)
-#     lgs bit 0  →  one bit BELOW the {L,G,S} window  (not sampled)
-#
-#   So the sample is {L-from-A, lgs[2], lgs[1]}.
-#
-#   A = MaxNorm    (mantissa all-ones)  → L = 1  → sample = {1, lgs[2], lgs[1]}
-#     lgs=0 → 100,  lgs=2 → 101,  lgs=4 → 110,  lgs=6 → 111
-#
-#   A = MaxNorm-1ulp (mantissa = all-ones with LSB cleared) → L = 0
-#     lgs=2 → 001,  lgs=4 → 010,  lgs=6 → 011
-#
-#   (lgs=1,3,5,7 give the same sample as lgs=0,2,4,6 respectively because
-#    lgs bit 0 falls outside the sample window.)
-#
-#   Negative intermediates: negate both A and B (same magnitude, sign flipped).
-#
-# Ops that can precisely control the intermediate:
-#   ADD:    FADD(±A,  ±B)              → intermediate = ±(A + B)
-#   SUB:    FSUB(±A,  ∓B)             → intermediate = ±(A + B)
-#   FMADD:  FMADD(±A, 1.0, ±B)        → intermediate = ±(A*1 + B) = ±(A + B)
-#   FMSUB:  FMSUB(±A, 1.0, ∓B)        → intermediate = ±(A*1 - (-B)) = ±(A + B)
-#   FNMADD: FNMADD(∓A, 1.0, ∓B)       → intermediate = -(∓A + ∓B) = ±(A + B)
-#   FNMSUB: FNMSUB(∓A, 1.0, ±B)       → intermediate = -(∓A - ±B) = ±(A + B)
-#
-#   MUL/DIV: MUL(A, 1.0) = A exactly → G=0, S=0 → only LGS=100 reachable.
-#     Used to cover the op_mul and op_div cross bins for LGS=100.
-#   MIN/MAX/FSGNJ*: intermediate = verbatim input → same as MUL; LGS=100 only.
-#   CSN: listed in FP_result_op_bins.svh but not implemented by the reference model.
-#   SQRT: sqrt(MaxNorm) has exponent ≈ MaxNorm.unbiased/2, never at MaxNorm exponent.
-#         op_sqrt × pm_3ulp / gt_maxNorm / exp_range[d≥0] bins are structurally
-#         unreachable. The covergroup has no ignore_bins for them.
-#   NOTE: op_fma bin ({[OP_FMA:OP_FMA|0xF]}) is satisfied by FMADD (0x51 ∈ [0x50:0x5F])
-#         since SV coverpoint bins count each sample independently.
-#
-# ── 2. F*_gt_maxNorm_p_3ulp ───────────────────────────────────────────────
-# Guard:  intermX == F*_MAXNORM_EXP
-# Bin:    intermM >= 2^(INTERM_M_BITS - M - 2)   (a single "large significand" bin)
-#
-# The threshold 2^(192-M-2) is far below MaxNorm's significand (which has all M
-# mantissa bits set, giving intermM ≈ 2^191). Every vector that satisfies the
-# _pm_3ulp guard also satisfies this bin. No extra vectors needed for this
-# coverpoint — it is fully covered by the _pm_3ulp vectors.
-#
-# ── 3. F*_maxNorm_pm3_exp_range ───────────────────────────────────────────
-# Samples: intermX  (biased exponent of the intermediate)
-# Bins:    one per exponent in [MAXNORM_EXP-3 : MAXNORM_EXP+3]   (7 individual bins)
-#
-# For d ∈ {-3,-2,-1,0}  (exponents ≤ MAXNORM_EXP):
-#   A = normal FP at biased_exp = MAXNORM_EXP + d, mantissa all-ones.
-#   Any op applied to A with a neutral second operand passes A's exponent through.
-#   Use ADD(A, 0), MUL(A, 1.0), DIV(A, 1.0), FMADD(A, 1.0, 0), and pass-through
-#   ops (MIN, MAX, FSGNJ*) to cover all FP_result_ops bins.
-#
-# For d ∈ {+1,+2,+3}  (exponents > MAXNORM_EXP, in the overflow range):
-#   Use FMUL(±MaxNorm, 2^d).  The infinite-precision product has unbiased exponent
-#   MaxNorm.unbiased + d → biased = MAXNORM_EXP + d.  The rounded result overflows
-#   to ±Inf, which is the intended overflow-boundary behavior.
-#   Also use ADD(MaxNorm, MaxNorm_at_exp+d-1) and FMA variants.
 
+# B4 Model: Overflow and Near Overflow
+#
+# This model creates a test-case for each of the following constraints on the
+# intermediate results:
+#
+#   i.   All the numbers in the range [+MaxNorm – 3 ulp, +MaxNorm + 3 ulp]
+#   ii.  All the numbers in the range [-MaxNorm – 3 ulp, -MaxNorm + 3 ulp]
+#   iii. A random number that is larger than +MaxNorm + 3 ulp
+#   iv.  A random number that is smaller than -MaxNorm – 3 ulp
+#   v.   One number for every exponent in the range
+#        [MaxNorm.exp - 3, MaxNorm.exp + 3] for positive and negative numbers
+#
+# Operation:     All
+# Rounding Mode: All
+# Enable Bits:   XE, OE (Both On and both Off)
+#
+# ULP definition used here:
+#   ±1 ULP = last bit of mantissa (LSB=1), guard bit = 0, sticky = 0
+
+import random
 from pathlib import Path
 from typing import TextIO
+from random import seed 
 
 import cover_float.common.constants as const
+from cover_float.common.util import reproducible_hash
 from cover_float.reference import run_and_store_test_vector
 
-# rounding_mode_all in the covergroup has exactly 5 bins (ROD is absent)
-ROUND_MODES = [
+MAXNORM_MANTISSA = { #maxnrom mantissa in dec form -> only check for Half Precision for now
+    const.FMT_HALF: [1020,  # Positive Max Norm - 3 ULP ~ 65408
+                     1021,  # Positive Max Norm - 2 ULP ~ 65440
+                     1022,  # Positive Max Norm - 1 ULP ~ 65504
+                     1023,  # Positive Max Norm ~ 65504
+                     1024,  # Positive Max Norm + 1 ULP~ 65600 (Inf)
+                     1025,  # Positive Max Norm + 2 ULP~ 65792 (Inf)
+                     1026], # Positive Max Norm + 3 ULP~ 66048 (Inf)
+}
+
+
+ROUNDING_MODES = [
     const.ROUND_NEAR_EVEN,
     const.ROUND_MINMAG,
     const.ROUND_MIN,
     const.ROUND_MAX,
     const.ROUND_NEAR_MAXMAG,
+    const.ROUND_ODD
 ]
 
-ZERO_PAD = "0" * 32
+SRC1_OPS = [const.OP_SQRT, const.OP_CLASS]
 
-
-
-# ---------------------------------------------------------------------------
-# FP construction helpers
-# ---------------------------------------------------------------------------
-
-def _fp_hex(sign: int, biased_exp: int, mantissa: int, E: int, M: int) -> str:
-    """Pack (sign, biased_exp, mantissa) into a 32-char left-zero-padded hex string."""
-    raw = (sign << (E + M)) | (biased_exp << M) | mantissa
-    hex_chars = (1 + E + M + 3) // 4
-    return f"{raw:0{hex_chars}x}".rjust(32, "0")
-
-
-def _maxnorm(sign: int, E: int, M: int) -> str:
-    """±MaxNorm: largest finite normal number."""
-    return _fp_hex(sign, (1 << E) - 2, (1 << M) - 1, E, M)
-
-
-def _maxnorm_m1ulp(sign: int, E: int, M: int) -> str:
-    """±(MaxNorm - 1ulp): same exponent as MaxNorm, mantissa LSB cleared."""
-    return _fp_hex(sign, (1 << E) - 2, ((1 << M) - 1) ^ 1, E, M)
-
-
-def _one(E: int, M: int, bias: int) -> str:
-    """+1.0"""
-    return _fp_hex(0, bias, 0, E, M)
-
-
-def _lgs_b(lgs: int, sign: int, E: int, M: int, bias: int) -> str:
-    """
-    Return ±lgs * 2^(ulp_exp - 3), the sub-ulp operand that sets the G and S
-    bits of the intermediate when added to ±MaxNorm or ±(MaxNorm-1ulp).
-
-    lgs must be even (0, 2, 4, 6) to produce distinct {L,G,S} samples, since
-    lgs bit 0 falls outside the 3-bit sample window and is ignored by the
-    coverpoint.  Passing an odd lgs is safe but produces the same sample as
-    lgs-1.
-
-    lgs == 0 → returns +0.0 (zero regardless of sign).
-    """
-    if lgs == 0:
-        return ZERO_PAD
-    max_biased = (1 << E) - 2
-    unbiased   = max_biased - bias
-    ulp_exp    = unbiased - M
-    sub_exp    = ulp_exp - 3           # exponent of 1/8 ulp
-
-    k_bits   = lgs.bit_length() - 1
-    b_biased = (sub_exp + k_bits) + bias
-    frac     = lgs ^ (1 << k_bits)
-    mantissa = frac << (M - k_bits)
-
-    return _fp_hex(sign, b_biased, mantissa, E, M)
-
-
-def _at_exp(sign: int, biased_exp: int, E: int, M: int) -> str:
-    """A normal FP number at the given biased exponent with all-ones mantissa."""
-    biased_exp = max(1, min(biased_exp, (1 << E) - 2))
-    return _fp_hex(sign, biased_exp, (1 << M) - 1, E, M)
-
-
-def _scale(d: int, E: int, M: int, bias: int) -> str:
-    """+2^d as a FP number (mantissa = 0, biased_exp = d + bias)."""
-    biased = max(1, min(d + bias, (1 << E) - 2))
-    return _fp_hex(0, biased, 0, E, M)
-
-
-# ---------------------------------------------------------------------------
-# Emit -> writes the test vectors
-# ---------------------------------------------------------------------------
-
-def _emit(op: str, rm: str, a: str, b: str, c: str,
-          fmt: str, res_fmt: str,
-          test_f: TextIO, cover_f: TextIO) -> None:
-    tv = f"{op}_{rm}_{a}_{b}_{c}_{fmt}_{ZERO_PAD}_{res_fmt}_00"
-    run_and_store_test_vector(tv, test_f, cover_f)
-
-
-# ---------------------------------------------------------------------------
-# Coverpoints 1 & 2: _pm_3ulp and _gt_maxNorm_p_3ulp
-# ---------------------------------------------------------------------------
-
-# Map: target LGS sample → (A constructor, lgs_value_for_B)
-# {L, G, S} = {A_mantissa_LSB, lgs[2], lgs[1]}
-_LGS_CONFIGS = [
-    # (use_maxnorm_m1ulp, lgs_for_b)  — target sample shown for clarity
-    (True,  2),   # L=0, G=0, S=1  → sample 001
-    (True,  4),   # L=0, G=1, S=0  → sample 010
-    (True,  6),   # L=0, G=1, S=1  → sample 011
-    (False, 0),   # L=1, G=0, S=0  → sample 100  (B=0)
-    (False, 2),   # L=1, G=0, S=1  → sample 101
-    (False, 4),   # L=1, G=1, S=0  → sample 110
-    (False, 6),   # L=1, G=1, S=1  → sample 111
+SRC2_OPS = [
+    const.OP_ADD,
+    const.OP_SUB,
+    const.OP_MUL,
+    const.OP_DIV,
+    const.OP_FEQ,
+    const.OP_FLT,
+    const.OP_FLE,
+    const.OP_MIN,
+    const.OP_MAX,
+    const.OP_FSGNJ,
+    const.OP_FSGNJN,
+    const.OP_FSGNJX,
 ]
 
+SRC3_OPS = [const.OP_FMADD, const.OP_FMSUB, const.OP_FNMADD, const.OP_FNMSUB]
 
-def _write_pm_3ulp(fmt: str, E: int, M: int, bias: int,
-                   test_f: TextIO, cover_f: TextIO) -> None:
+import struct
+from decimal import Decimal
+
+
+def decimalToComponents(value:int, fmt: str) -> tuple[int, int]:
     """
-    Covers F*_maxNorm_pm_3ulp (all 7 LGS bins) and implicitly
-    F*_gt_maxNorm_p_3ulp (large-significand bin at intermX==MAXNORM_EXP).
+    Break a decimal number into its IEEE 754 components for the given format.
+    Sign is excluded — pass it separately to decimalComponentsToHex().
 
-    For each LGS target × 5 rounding modes × 2 signs:
-      ADD, SUB, FMADD, FMSUB, FNMADD, FNMSUB  — can precisely set intermediate
-      MUL, DIV, MIN, MAX, FSGNJ*              — limited to LGS=100 (MUL(A,1.0) etc.)
+    Args:
+        value: exact numeric value (int, float, or Decimal), must be positive
+        fmt:   one of FMT_HALF, FMT_BF16, FMT_SINGLE, FMT_DOUBLE, FMT_QUAD
+
+    Returns:
+        (biased_exp, mantissa) as integers, ready for decimalComponentsToHex()
+
+    Example:
+        exp, mant = decimalToComponents(65504, const.FMT_HALF)
+        hex_val = decimalComponentsToHex(const.FMT_HALF, sign, exp, mant)
     """
-    one = _one(E, M, bias)
+    exp_bits = const.EXPONENT_BITS[fmt]
+    man_bits = const.MANTISSA_BITS[fmt]
+    bias     = (1 << (exp_bits - 1)) - 1
 
-    for use_m1ulp, lgs in _LGS_CONFIGS:
+    if fmt == const.FMT_SINGLE:
+        raw        = struct.unpack(">I", struct.pack(">f", float(value)))[0]
+        biased_exp = (raw >> 23) & 0xFF
+        mantissa   = raw & 0x7FFFFF
+
+    elif fmt == const.FMT_DOUBLE:
+        raw        = struct.unpack(">Q", struct.pack(">d", float(value)))[0]
+        biased_exp = (raw >> 52) & 0x7FF
+        mantissa   = raw & 0x000FFFFFFFFFFFFF
+
+    elif fmt == const.FMT_HALF:
+        # F16 MaxNorm-range values are exactly representable in F32, float() is safe
+        raw32      = struct.unpack(">I", struct.pack(">f", float(value)))[0]
+        f32_exp    = (raw32 >> 23) & 0xFF
+        f32_mant   = raw32 & 0x7FFFFF
+        unbiased   = f32_exp - 127
+        biased_exp = unbiased + 15
+        mantissa   = f32_mant >> (23 - 10)
+
+    elif fmt == const.FMT_BF16:
+        # BF16 values are exactly representable in F32, float() is safe
+        raw32      = struct.unpack(">I", struct.pack(">f", float(value)))[0]
+        biased_exp = (raw32 >> 23) & 0xFF
+        mantissa   = (raw32 >> 16) & 0x7F
+
+    elif fmt == const.FMT_QUAD:
+        # Never call float() here — F128 values exceed float64 precision
+        value      = value if not isinstance(value, Decimal) else value
+        value      = abs(value)
+        if value == 0:
+            return (0, 0)
+        # Compute unbiased exponent via integer bit_length (exact, no float)
+        unbiased   = int(value).bit_length() - 1
+        # Refine in case int truncation was off by one
+        scale      = Decimal(2) ** unbiased
+        normalized = value / scale
+        if normalized >= 2:
+            unbiased  += 1
+            scale     *= 2
+            normalized = value / scale
+        elif normalized < 1:
+            unbiased  -= 1
+            scale     /= 2
+            normalized = value / scale
+
+        biased_exp = unbiased + bias
+
+        # Extract mantissa bits via repeated doubling (arbitrary precision)
+        fraction   = normalized - 1  # strip implicit leading 1
+        mantissa   = 0
+        for _ in range(man_bits):
+            fraction  *= 2
+            bit        = int(fraction)
+            mantissa   = (mantissa << 1) | bit
+            fraction  -= bit
+
+    else:
+        raise ValueError(f"Unsupported format: {fmt}")
+
+    return (biased_exp, mantissa)
+
+
+
+
+
+
+def decimalComponentsToHex(fmt: str, sign: int, biased_exp: int, mantissa: int) -> str:
+    b_sign = f"{sign:01b}"
+    b_exponent = f"{biased_exp:0{const.EXPONENT_BITS[fmt]}b}"
+    b_mantissa = f"{mantissa:0{const.MANTISSA_BITS[fmt]}b}"
+    b_complete = b_sign + b_exponent + b_mantissa
+    h_complete = f"{int(b_complete, 2):032X}"
+    return h_complete
+
+
+
+from decimal import Decimal
+
+MAXNORM_DECIMAL = {
+    # FMT_HALF  |  MaxNorm = 65504  |  ulp = 32
+    const.FMT_HALF: [
+        65408,   # MaxNorm -3 ulp
+        65440,   # MaxNorm -2 ulp
+        65472,   # MaxNorm -1 ulp
+        65504,   # MaxNorm
+        65536,   # MaxNorm +1 ulp  (intermediate only - overflows)
+        65568,   # MaxNorm +2 ulp  (intermediate only - overflows)
+        65600,   # MaxNorm +3 ulp  (intermediate only - overflows)
+    ],
+}
+
+
+
+
+
+def write_maxnorm_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
+    for target in MAXNORM_DECIMAL[fmt]:
+        hashval = reproducible_hash(const.OP_ADD + fmt + "b4")
+        seed(hashval)
+
+        # Pass target directly as operand A — guarantees intermediate IS target
+        exp_a, mant_a = decimalToComponents(target, fmt)
+
         for sign in (0, 1):
-            # Magnitude of A operand
-            a_mag  = _maxnorm_m1ulp(0, E, M) if use_m1ulp else _maxnorm(0, E, M)
-            a_mag_neg = _maxnorm_m1ulp(1, E, M) if use_m1ulp else _maxnorm(1, E, M)
+            hex_a = decimalComponentsToHex(fmt, sign, exp_a, mant_a)
+            # B is ±0: sign bit matches, exp=0, mant=0
+            hex_b = decimalComponentsToHex(fmt, sign, 0, 0)
 
-            # The signed A and B for each polarity
-            # Positive intermediate: A positive, B positive
-            a_pos = a_mag
-            b_pos = _lgs_b(lgs, 0, E, M, bias)
+            for rm in ROUNDING_MODES:
+                run_and_store_test_vector(
+                    f"{const.OP_ADD}_{rm}_{hex_a}_{hex_b}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00",
+                    test_f, cover_f
+                )
 
-            # Negative intermediate: A negative, B negative
-            a_neg = a_mag_neg
-            b_neg = _lgs_b(lgs, 1, E, M, bias)
-
-            for rm in ROUND_MODES:
-                # ── Positive intermediate ──────────────────────────────────
-                # ADD(+A, +B)
-                _emit(const.OP_ADD, rm, a_pos, b_pos, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                # SUB(+A, -B) = A - (-B) = A + B
-                b_neg_for_sub = _lgs_b(lgs, 1, E, M, bias)
-                _emit(const.OP_SUB, rm, a_pos, b_neg_for_sub, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                # FMADD(+A, 1, +B) = A*1 + B
-                _emit(const.OP_FMADD, rm, a_pos, one, b_pos, fmt, fmt, test_f, cover_f)
-                # FMSUB(+A, 1, -B) = A*1 - (-B) = A + B
-                _emit(const.OP_FMSUB, rm, a_pos, one, b_neg_for_sub, fmt, fmt, test_f, cover_f)
-                # FNMADD(-A, 1, -B) = -((-A)*1 + (-B)) = A + B
-                _emit(const.OP_FNMADD, rm, a_neg, one, b_neg_for_sub, fmt, fmt, test_f, cover_f)
-                # FNMSUB(-A, 1, +B) = -((-A)*1 - B) = A + B
-                _emit(const.OP_FNMSUB, rm, a_neg, one, b_pos, fmt, fmt, test_f, cover_f)
-
-                # ── Negative intermediate ──────────────────────────────────
-                # ADD(-A, -B)
-                _emit(const.OP_ADD, rm, a_neg, b_neg, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                # SUB(-A, +B) = -A - B = -(A + B)
-                _emit(const.OP_SUB, rm, a_neg, b_pos, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                # FMADD(-A, 1, -B) = -A - B
-                _emit(const.OP_FMADD, rm, a_neg, one, b_neg, fmt, fmt, test_f, cover_f)
-                # FMSUB(-A, 1, +B) = -A - B
-                _emit(const.OP_FMSUB, rm, a_neg, one, b_pos, fmt, fmt, test_f, cover_f)
-                # FNMADD(+A, 1, +B) = -(A + B)
-                _emit(const.OP_FNMADD, rm, a_pos, one, b_pos, fmt, fmt, test_f, cover_f)
-                # FNMSUB(+A, 1, -B) = -(A - (-B)) = -(A + B)
-                _emit(const.OP_FNMSUB, rm, a_pos, one, b_neg_for_sub, fmt, fmt, test_f, cover_f)
-
-    # ── LGS=100 coverage for remaining FP_result_ops ──────────────────────
-    # MUL(A, 1.0), DIV(A, 1.0), MIN(A, A), MAX(A, A), FSGNJ*(A, A)
-    # These can only produce LGS=100 (intermediate = A exactly, G=0, S=0)
-    # but they DO cover their respective op bins for LGS=100 × all rm × both signs.
-    # NOTE: OP_CSN (op_csn bin) is listed in FP_result_op_bins.svh but is not
-    # implemented by the reference model and cannot be emitted.
-    for sign in (0, 1):
-        a = _maxnorm(sign, E, M)
-        for rm in ROUND_MODES:
-            _emit(const.OP_MUL,    rm, a, one,      ZERO_PAD, fmt, fmt, test_f, cover_f)
-            _emit(const.OP_DIV,    rm, a, one,      ZERO_PAD, fmt, fmt, test_f, cover_f)
-            _emit(const.OP_MIN,    rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
-            _emit(const.OP_MAX,    rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
-            _emit(const.OP_FSGNJ,  rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
-            _emit(const.OP_FSGNJN, rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
-            _emit(const.OP_FSGNJX, rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
+    
+            
 
 
-# ---------------------------------------------------------------------------
-# Coverpoint 3: _maxNorm_pm3_exp_range
-# ---------------------------------------------------------------------------
 
-def _write_exp_range(fmt: str, E: int, M: int, bias: int,
-                     test_f: TextIO, cover_f: TextIO) -> None:
-    """
-    Covers F*_maxNorm_pm3_exp_range: one bin per exponent in
-    [MAXNORM_EXP-3 : MAXNORM_EXP+3], crossed with FP_result_ops × 5 rm × sign.
 
-    d ≤ 0: A = normal number at biased_exp = MAXNORM_EXP+d (all-ones mantissa).
-           Neutral second operand leaves A's exponent as the intermediate exponent.
-    d > 0: FMUL(±MaxNorm, 2^d) → infinite-precision product at biased = MAXNORM_EXP+d.
-           Result overflows to ±Inf (expected).
-    """
-    max_biased = (1 << E) - 2
-    one = _one(E, M, bias)
 
-    for d in range(-3, 4):
+
+
+
+
+
+
+def write_exp_range_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
+    target_exp = const.BIASED_EXP[fmt][1]  # MaxNorm exponent
+    for exp_diff in range(-3, 4):  # Sweep from -3 to +3 ULPs
+        biased_exp = target_exp + exp_diff
         for sign in (0, 1):
-            if d <= 0:
-                a = _at_exp(sign, max_biased + d, E, M)
-                for rm in ROUND_MODES:
-                    # ADD / SUB with zero
-                    _emit(const.OP_ADD,    rm, a, ZERO_PAD, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_SUB,    rm, a, ZERO_PAD, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    # MUL / DIV by 1
-                    _emit(const.OP_MUL,    rm, a, one,      ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_DIV,    rm, a, one,      ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    # FMA family: A*1 + 0
-                    _emit(const.OP_FMADD,  rm, a, one,      ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_FMSUB,  rm, a, one,      ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_FNMADD, rm, a, one,      ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_FNMSUB, rm, a, one,      ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    # Pass-through ops (intermediate = A, exponent unchanged)
-                    _emit(const.OP_MIN,    rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_MAX,    rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_FSGNJ,  rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_FSGNJN, rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_FSGNJX, rm, a, a,         ZERO_PAD, fmt, fmt, test_f, cover_f)
-            else:
-                # d > 0: intermediate exponent above MaxNorm
-                mx  = _maxnorm(sign, E, M)
-                sc  = _scale(d, E, M, bias)           # +2^d
-                # Large operand at MAXNORM_EXP + d - 1 (same sign) for ADD/SUB
-                b_add = _at_exp(sign, max_biased + d - 1, E, M)
-                # Opposite-sign version for SUB: SUB(MaxNorm, -B) = MaxNorm + B
-                b_sub = _at_exp(sign ^ 1, max_biased + d - 1, E, M)
-                for rm in ROUND_MODES:
-                    # MUL(MaxNorm, 2^d): product exponent = MAXNORM_EXP + d
-                    _emit(const.OP_MUL,    rm, mx, sc,    ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    # ADD(MaxNorm, large_at_d-1): sum exponent ≈ MAXNORM_EXP + d
-                    _emit(const.OP_ADD,    rm, mx, b_add, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    # SUB(MaxNorm, -large_at_d-1) = MaxNorm + large: same exponent as ADD
-                    _emit(const.OP_SUB,    rm, mx, b_sub, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    # FMADD(MaxNorm, 2^d, 0)
-                    _emit(const.OP_FMADD,  rm, mx, sc,    ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    # FMSUB(MaxNorm, 2^d, 0)
-                    _emit(const.OP_FMSUB,  rm, mx, sc,    ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    # FNMADD(-MaxNorm, 2^d, 0) = -(MaxNorm * 2^d + 0) = MaxNorm * 2^d
-                    mx_neg = _maxnorm(sign ^ 1, E, M)
-                    _emit(const.OP_FNMADD, rm, mx_neg, sc, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    _emit(const.OP_FNMSUB, rm, mx_neg, sc, ZERO_PAD, fmt, fmt, test_f, cover_f)
-                    # DIV(MaxNorm, 2^-d): product exponent = MAXNORM_EXP + d
-                    sc_neg = _scale(-d, E, M, bias)    # 2^-d (tiny divisor)
-                    _emit(const.OP_DIV,    rm, mx, sc_neg, ZERO_PAD, fmt, fmt, test_f, cover_f)
+            mant = random.getrandbits(const.MANTISSA_BITS[fmt])          # integer, like B14
+            hex_a = decimalComponentsToHex(fmt, sign, biased_exp, mant)
+
+            for rm in ROUNDING_MODES:
+                for op in SRC1_OPS: 
+                    hashval = reproducible_hash(op + fmt + "b4")
+                    seed(hashval) 
+                    run_and_store_test_vector(
+                        f"{op}_{rm}_{hex_a}_{32 * '0'}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00",
+                        test_f, cover_f
+                    )
+                for op in SRC2_OPS:
+                    hashval = reproducible_hash(op + fmt + "b4")
+                    seed(hashval) 
+                    mant_b = random.getrandbits(const.MANTISSA_BITS[fmt])
+                    hex_b = decimalComponentsToHex(fmt, sign, biased_exp, mant_b)
+                    run_and_store_test_vector(
+                        f"{op}_{rm}_{hex_a}_{hex_b}_{32 * '0'}_{fmt}_{32 * '0'}_{fmt}_00",
+                        test_f, cover_f
+                    )
+                for op in SRC3_OPS:
+                    hashval = reproducible_hash(op + fmt + "b4")
+                    seed(hashval) 
+                    mant_b = random.getrandbits(const.MANTISSA_BITS[fmt])
+                    mant_c = random.getrandbits(const.MANTISSA_BITS[fmt])
+                    hex_b = decimalComponentsToHex(fmt, sign, biased_exp, mant_b)
+                    hex_c = decimalComponentsToHex(fmt, sign, biased_exp, mant_c)
+                    run_and_store_test_vector(
+                        f"{op}_{rm}_{hex_a}_{hex_b}_{hex_c}_{fmt}_{32 * '0'}_{fmt}_00",
+                        test_f, cover_f
+                    )
 
 
 # ---------------------------------------------------------------------------
-# Top-level
+# Top-level driver
 # ---------------------------------------------------------------------------
-
-def _write_all(fmt: str, E: int, M: int, bias: int,
-               test_f: TextIO, cover_f: TextIO) -> None:
-    _write_pm_3ulp(fmt, E, M, bias, test_f, cover_f)
-    _write_exp_range(fmt, E, M, bias, test_f, cover_f)
-
 
 def main() -> None:
-    fmt_params = {
-        const.FMT_HALF:   (const.EXPONENT_BITS[const.FMT_HALF],
-                           const.MANTISSA_BITS[const.FMT_HALF],
-                           const.BIAS[const.FMT_HALF]),
-        const.FMT_BF16:   (const.EXPONENT_BITS[const.FMT_BF16],
-                           const.MANTISSA_BITS[const.FMT_BF16],
-                           const.BIAS[const.FMT_BF16]),
-        const.FMT_SINGLE: (const.EXPONENT_BITS[const.FMT_SINGLE],
-                           const.MANTISSA_BITS[const.FMT_SINGLE],
-                           const.BIAS[const.FMT_SINGLE]),
-        const.FMT_DOUBLE: (const.EXPONENT_BITS[const.FMT_DOUBLE],
-                           const.MANTISSA_BITS[const.FMT_DOUBLE],
-                           const.BIAS[const.FMT_DOUBLE]),
-        const.FMT_QUAD:   (const.EXPONENT_BITS[const.FMT_QUAD],
-                           const.MANTISSA_BITS[const.FMT_QUAD],
-                           const.BIAS[const.FMT_QUAD]),
-    }
+    # This will generate the hex for the internal intermediate result of MaxNorm + 1 ulp
+    hex_result = decimalComponentsToHex(const.FMT_HALF, 0, 31, 0)
+    print(hex_result)
 
-    Path("tests/testvectors").mkdir(parents=True, exist_ok=True)
-    Path("tests/covervectors").mkdir(parents=True, exist_ok=True)
 
     with (
         Path("tests/testvectors/B4_tv.txt").open("w") as test_f,
-        Path("tests/covervectors/B4_cv.txt").open("w") as cover_f
+        Path("tests/covervectors/B4_cv.txt").open("w") as cover_f,
     ):
-        test_f.write("// B4: Overflow and Near Overflow\n")
-        test_f.write("// Aharoni et al. 2008, Section B4\n")
-
+       # write_maxnorm_tests(const.FMT_HALF, test_f, cover_f)
         for fmt in const.FLOAT_FMTS:
-            E, M, bias = fmt_params[fmt]
-            _write_all(fmt, E, M, bias, test_f, cover_f)
-
-    total = sum(1 for ln in open("tests/testvectors/B4_tv.txt")
-                if not ln.startswith("//"))
-    print(f"Generated {total} total B4 test vectors.")
+            write_exp_range_tests(fmt, test_f, cover_f)
+    print("B4 generation complete.")
 
 
 if __name__ == "__main__":
     main()
+
