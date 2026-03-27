@@ -20,8 +20,7 @@ def main() -> None:
         help="Suppress error checking between expected and actual results",
     )
     args = parser.parse_args()
-
-    with Path(args.input_file).open("r") as infile, Path(args.output_file).open("w") as outfile:
+    
     with Path(args.input_file).open("r") as infile, Path(args.output_file).open("w") as outfile:
         for line in infile:
             line = line.strip()
@@ -48,22 +47,6 @@ def auto_parse(model_name: str, output_dir: str) -> None:
 
 
 
-def auto_parse(model_name: str, output_dir: str) -> None:
-    input_path = Path(output_dir) / "testvectors" / f"{model_name}_tv.txt"
-    output_path = Path(output_dir) / "readable" / f"{model_name}_parsed.txt"
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    count = 0
-    with input_path.open("r") as infile, output_path.open("w") as outfile:
-        for line in infile:
-            parsed = parse_test_vector(line)
-            if parsed:
-                outfile.write(format_output(parsed) + "\n")
-                count += 1
-    print(f"Parsed {count} {model_name} vectors to {output_path}")
-
-
 def testgen() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -86,9 +69,7 @@ def testgen() -> None:
         auto_parse("B4", args.output_dir)
         tg.B9.main()
         auto_parse("B9", args.output_dir)
-        auto_parse("B9", args.output_dir)
         tg.B10.main()
-        auto_parse("B10", args.output_dir)
         auto_parse("B10", args.output_dir)
         tg.B12.main()
         auto_parse("B12", args.output_dir)
@@ -100,16 +81,11 @@ def testgen() -> None:
         if "B3" in args.models:
             tg.B3.main()
             auto_parse("B3", args.output_dir)
-        if "B4" in args.models:
-            tg.B4.main()
-            auto_parse("B4", args.output_dir)
         if "B9" in args.models:
             tg.B9.main()
             auto_parse("B9", args.output_dir)
-            auto_parse("B9", args.output_dir)
         if "B10" in args.models:
             tg.B10.main()
-            auto_parse("B10", args.output_dir)
             auto_parse("B10", args.output_dir)
         if "B12" in args.models:
             tg.B12.main()
@@ -118,7 +94,3 @@ def testgen() -> None:
             tg.B14.main()
             auto_parse("B14", args.output_dir)
 
-            auto_parse("B12", args.output_dir)
-        if "B14" in args.models:
-            tg.B14.main()
-            auto_parse("B14", args.output_dir)
