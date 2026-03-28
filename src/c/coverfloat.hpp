@@ -5,6 +5,7 @@
 #include "softfloat/platform.h"
 #include "softfloat/softfloat.h"
 #include "softfloat/specialize.h"
+#include <boost/multiprecision/cpp_int.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -129,6 +130,13 @@ typedef struct {
         x <<= 64;                                                                                                      \
         x |= f.v[0];                                                                                                   \
     } while (0)
+
+struct MPIntermResult {
+    bool sign;
+    int32_t exp;
+    boost::multiprecision::uint256_t sig;
+    boost::multiprecision::uint256_t fma_pre_addition;
+};
 
 inline uint32_t signed_to_unsigned(int32_t in) {
     uint32_t out;
