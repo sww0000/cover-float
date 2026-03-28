@@ -1773,7 +1773,7 @@ int reference_model(
     softfloat_getIntermResults(intermResult);
 
     if (op == OP_CFI && operandFmt == FMT_HALF && (resultFmt == FMT_LONG || resultFmt == FMT_ULONG)) {
-        intermResult.sig <<= 32;
+        intermResult.sig >>= 32;
     }
 
     if (intermResult.exp == 0 && intermResult.sig == 0) {
@@ -1927,6 +1927,7 @@ int reference_model(
     //     shifted_sig.v0 | (intermResult->sigExtra >> (-shift_amount & 63)); // Look at shortShiftLeft source
     // intermResult->sigExtra = intermResult->sigExtra << shift_amount;
     intermResult.sig <<= shift_amount;
+    intermResult.sig &= (mp::uint256_t(1) << 192) - 1;
 
     return EXIT_SUCCESS;
 }
@@ -2055,12 +2056,13 @@ std::string coverfloat_runtestvector(const std::string &input, bool suppress_err
     // char output[512];
 
     std::stringstream output;
-    output << std::hex;
-    output << std::setw(2) << op << '_' << rm << '_';
-    output << std::setw(32) << a << '_' << b << '_' << c << '_';
-    output << std::setw(2) << opFmt << '_';
+    output << std::hex << std::setfill('0');
+    output << std::setw(8) << op << '_';
+    output << std::setw(2) << rm16 << '_';
+    output << std::setw(32) << a << '_' << std::setw(32) << b << '_' << std::setw(32) << c << '_';
+    output << std::setw(2) << opFmt16 << '_';
     output << std::setw(32) << newRes << '_';
-    output << std::setw(2) << resFmt << '_' << newFlags << '_';
+    output << std::setw(2) << resFmt16 << '_' << std::setw(2) << static_cast<uint16_t>(newFlags) << '_';
     output << std::setw(1) << intermRes.sign << '_';
     output << std::setw(8) << intermRes.exp << '_';
     output << std::setw(48) << intermRes.sig << "\n";
