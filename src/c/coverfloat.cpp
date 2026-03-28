@@ -1865,6 +1865,21 @@ int reference_model(
         }
     }
 
+    // If we took an fma operation, there is now an alignment shift that needs to take place
+    if ((op & ~(0xf)) == OP_FMA) {
+        if (operandFmt == FMT_SINGLE) {
+            intermResult.fma_pre_addition >>= 14;
+        } else if (operandFmt == FMT_DOUBLE) {
+            intermResult.fma_pre_addition >>= 20;
+        } else if (operandFmt == FMT_QUAD) {
+            intermResult.fma_pre_addition >>= 23;
+        } else if (operandFmt == FMT_HALF) {
+            intermResult.fma_pre_addition >>= 8;
+        } else if (operandFmt == FMT_BF16) {
+            intermResult.fma_pre_addition >>= 38;
+        }
+    }
+
     // Post-process the intermediate results:
     // 1. Ensure that subnorms have everything in the right place
     // 2. Then shift off the leading ones
@@ -2065,7 +2080,10 @@ std::string coverfloat_runtestvector(const std::string &input, bool suppress_err
     output << std::setw(2) << resFmt16 << '_' << std::setw(2) << static_cast<uint16_t>(newFlags) << '_';
     output << std::setw(1) << intermRes.sign << '_';
     output << std::setw(8) << intermRes.exp << '_';
-    output << std::setw(48) << intermRes.sig << "\n";
+    output << std::setw(48) << intermRes.sig << '_';
+    output << std::setw(64) << intermRes.fma_pre_addition;
+
+    output << "\n";
 
     // snprintf(
     //     output,
