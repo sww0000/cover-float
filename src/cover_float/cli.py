@@ -1,11 +1,7 @@
 import argparse
 from pathlib import Path
-from pathlib import Path
 
 import cover_float.testgen as tg
-from cover_float.reference import run_test_vector
-from cover_float.scripts.parse_testvectors import format_output, parse_test_vector
-
 from cover_float.reference import run_test_vector
 from cover_float.scripts.parse_testvectors import format_output, parse_test_vector
 
@@ -20,7 +16,7 @@ def main() -> None:
         help="Suppress error checking between expected and actual results",
     )
     args = parser.parse_args()
-    
+
     with Path(args.input_file).open("r") as infile, Path(args.output_file).open("w") as outfile:
         for line in infile:
             line = line.strip()
@@ -46,7 +42,6 @@ def auto_parse(model_name: str, output_dir: str) -> None:
     print(f"Parsed {count} {model_name} vectors to {output_path}")
 
 
-
 def testgen() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -65,15 +60,18 @@ def testgen() -> None:
         auto_parse("B1", args.output_dir)
         tg.B3.main()
         auto_parse("B3", args.output_dir)
-        tg.B4.main()
-        auto_parse("B4", args.output_dir)
         tg.B9.main()
         auto_parse("B9", args.output_dir)
         tg.B10.main()
         auto_parse("B10", args.output_dir)
         tg.B12.main()
         auto_parse("B12", args.output_dir)
+        tg.B11.main()
+        auto_parse("B11", args.output_dir)
         tg.B14.main()
+        auto_parse("B14", args.output_dir)
+        tg.B15.main()
+        auto_parse("B15", args.output_dir)
     else:
         if "B1" in args.models:
             tg.B1.main()
@@ -87,10 +85,15 @@ def testgen() -> None:
         if "B10" in args.models:
             tg.B10.main()
             auto_parse("B10", args.output_dir)
+        if "B11" in args.models:
+            tg.B11.main()
+            auto_parse("B11", args.output_dir)
         if "B12" in args.models:
             tg.B12.main()
             auto_parse("B12", args.output_dir)
         if "B14" in args.models:
             tg.B14.main()
             auto_parse("B14", args.output_dir)
-
+        if "B15" in args.models:
+            tg.B15.main()
+            auto_parse("B15", args.output_dir)
