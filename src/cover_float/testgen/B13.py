@@ -22,6 +22,7 @@ from cover_float.common.util import reproducible_hash
 from cover_float.reference import run_and_store_test_vector
 
 
+# TODO: Investigate d = -1 case.
 def decimalComponentsToHex(fmt: str, sign: int, biased_exp: int, mantissa: int) -> str:
     b_sign = f"{sign:01b}"
     b_exp = f"{biased_exp:0{EXPONENT_BITS[fmt]}b}"
@@ -63,13 +64,13 @@ def makeCancellationMantissas(fmt: str, d: int, m_shifts: int) -> tuple[int, int
 
     # generate identical prefixes for both operands
     if k > 1:
-        a_prefix = 1 << (m - 1 - m_shifts) | random.getrandbits(k - 1) << (m - k + 1 - m_shifts)
+        a_prefix = 1 << (m - 1 - m_shifts) | random.getrandbits(k - 1) << (m - k - m_shifts)
         b_prefix = a_prefix
     else:
         a_prefix = 0
         b_prefix = 0
 
-    diff_bit = 1 << (m - k - m_shifts)  # differing bit
+    diff_bit = 1 << (m - k - m_shifts - 1)  # differing bit
 
     # randomly generate tails for both operands
     if k < (m - 1 - m_shifts):
@@ -114,7 +115,6 @@ def makeTestVectors(fmt: str, d: int, leading_zeros: int, operation: str, test_f
     write_fn = writeAdd if is_add else writeSub
     m_shifts = 0
 
-    # Randomly generate exponents
     a_exp = (
         -1
     ) * d - leading_zeros  # if a_exp is less than zero, clips to zero and shifts mantissa to the right by m_shift bits
@@ -166,11 +166,19 @@ def SubnormCancellationTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     for leading_zeros in range(m):
         for d in range(-p, 2):
-            seed(reproducible_hash(f"{fmt}_b13_add_{d}_{leading_zeros}"))
-            makeTestVectors(fmt, d, leading_zeros, "add", test_f, cover_f)
+            if d == -1 or d == 0 or d == 1:
+                if leading_zeros != (m - 1):
+                    seed(reproducible_hash(f"{fmt}_b13_add_{d}_{leading_zeros}"))
+                    makeTestVectors(fmt, d, leading_zeros, "add", test_f, cover_f)
 
-            seed(reproducible_hash(f"{fmt}_b13_sub_{d}_{leading_zeros}"))
-            makeTestVectors(fmt, d, leading_zeros, "sub", test_f, cover_f)
+                    seed(reproducible_hash(f"{fmt}_b13_sub_{d}_{leading_zeros}"))
+                    makeTestVectors(fmt, d, leading_zeros, "sub", test_f, cover_f)
+            else:
+                seed(reproducible_hash(f"{fmt}_b13_add_{d}_{leading_zeros}"))
+                makeTestVectors(fmt, d, leading_zeros, "add", test_f, cover_f)
+
+                seed(reproducible_hash(f"{fmt}_b13_sub_{d}_{leading_zeros}"))
+                makeTestVectors(fmt, d, leading_zeros, "sub", test_f, cover_f)
 
 
 def main() -> None:
