@@ -1,5 +1,4 @@
 #include "coverfloat.hpp"
-#include <boost/multiprecision/cpp_int.hpp>
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
@@ -27,7 +26,34 @@ void softfloat_getIntermResults(intermResult_t *result) {
     result->exp = softfloat_intermediateResult.exp;
     result->sig64 = softfloat_intermediateResult.sig64;
     result->sig0 = softfloat_intermediateResult.sig0;
-    result->sigExtra = softfloat_intermediateResult.sigExtra;
+    result->sigExtra64 = softfloat_intermediateResult.sigExtra64;
+    result->sigExtra0 = softfloat_intermediateResult.sigExtra0;
+
+    result->fmaPreAddition[indexWord(4, 3)] = softfloat_intermediateResult.fmaPreAddition[indexWord(4, 3)];
+    result->fmaPreAddition[indexWord(4, 2)] = softfloat_intermediateResult.fmaPreAddition[indexWord(4, 2)];
+    result->fmaPreAddition[indexWord(4, 1)] = softfloat_intermediateResult.fmaPreAddition[indexWord(4, 1)];
+    result->fmaPreAddition[indexWord(4, 0)] = softfloat_intermediateResult.fmaPreAddition[indexWord(4, 0)];
+}
+
+void softfloat_getIntermResults(MPIntermResult &result) {
+    result.sign = softfloat_intermediateResult.sign;
+    result.exp = softfloat_intermediateResult.exp;
+
+    result.sig = softfloat_intermediateResult.sig64;
+    result.sig <<= 64;
+    result.sig |= softfloat_intermediateResult.sig0;
+    result.sig <<= 64;
+    result.sig |= softfloat_intermediateResult.sigExtra64;
+    result.sig <<= 64;
+    result.sig |= softfloat_intermediateResult.sigExtra0;
+
+    result.fma_pre_addition = softfloat_intermediateResult.fmaPreAddition[indexWord(4, 3)];
+    result.fma_pre_addition <<= 64;
+    result.fma_pre_addition |= softfloat_intermediateResult.fmaPreAddition[indexWord(4, 2)];
+    result.fma_pre_addition <<= 64;
+    result.fma_pre_addition |= softfloat_intermediateResult.fmaPreAddition[indexWord(4, 1)];
+    result.fma_pre_addition <<= 64;
+    result.fma_pre_addition |= softfloat_intermediateResult.fmaPreAddition[indexWord(4, 0)];
 }
 
 void softfloat_clearIntermResults() {
@@ -36,7 +62,12 @@ void softfloat_clearIntermResults() {
     softfloat_intermediateResult.exp = 0;
     softfloat_intermediateResult.sig64 = 0;
     softfloat_intermediateResult.sig0 = 0;
-    softfloat_intermediateResult.sigExtra = 0;
+    softfloat_intermediateResult.sigExtra64 = 0;
+    softfloat_intermediateResult.sigExtra0 = 0;
+    softfloat_intermediateResult.fmaPreAddition[indexWord(4, 0)] = 0;
+    softfloat_intermediateResult.fmaPreAddition[indexWord(4, 1)] = 0;
+    softfloat_intermediateResult.fmaPreAddition[indexWord(4, 2)] = 0;
+    softfloat_intermediateResult.fmaPreAddition[indexWord(4, 3)] = 0;
 }
 
 /*
@@ -111,7 +142,7 @@ int reference_model(
 
     mp::uint128_t &result,
     uint8_t *flags,
-    intermResult_t *intermResult
+    MPIntermResult &intermResult
 ) {
 
     // clear flags so we get only triggered flags
@@ -1913,12 +1944,10 @@ int reference_model(
     softfloat_getIntermResults(intermResult);
 
     if (op == OP_CFI && operandFmt == FMT_HALF && (resultFmt == FMT_LONG || resultFmt == FMT_ULONG)) {
-        struct uint128 res = softfloat_shiftRightJam128(intermResult->sig64, intermResult->sig0, 32);
-        intermResult->sig64 = res.v64;
-        intermResult->sig0 = res.v0;
+        intermResult.sig >>= 32;
     }
 
-    if (intermResult->exp == 0 && intermResult->sig64 == 0) {
+    if (intermResult.exp == 0 && intermResult.sig == 0) {
         // Then we need to extract an intermediate result from the result
         switch (resultFmt) {
         case FMT_BF16: {
@@ -1929,11 +1958,11 @@ int reference_model(
             if (exp != 0) {
                 sig |= BF16_IMPLICIT_ONE;
             }
-            intermResult->sig64 = sig << (62 - BF16_SIG_BITS);
+            intermResult.sig = mp::uint256_t(sig) << (INTERM_SIG_LENGTH - 2 - BF16_SIG_BITS);
 
-            intermResult->exp = exp;
+            intermResult.exp = exp;
 
-            intermResult->sign = signBF16UI(result);
+            intermResult.sign = signBF16UI(result);
             break;
         }
         case FMT_HALF: {
@@ -1945,11 +1974,11 @@ int reference_model(
                 sig |= (1 << 10);
             }
 
-            intermResult->sig64 = sig << (62 - 10);
+            intermResult.sig = mp::uint256_t(sig) << (INTERM_SIG_LENGTH - 2 - 10);
 
-            intermResult->exp = exp;
+            intermResult.exp = exp;
 
-            intermResult->sign = signF16UI(result);
+            intermResult.sign = signF16UI(result);
             break;
         }
         case FMT_SINGLE: {
@@ -1958,12 +1987,12 @@ int reference_model(
 
             if (exp != 0) {
                 sig |= (1 << 23);
-                intermResult->sig64 = sig << (63 - 24);
+                intermResult.sig = mp::uint256_t(sig) << (INTERM_SIG_LENGTH - 2 - 23);
             }
 
-            intermResult->exp = exp;
+            intermResult.exp = exp;
 
-            intermResult->sign = signF32UI(result);
+            intermResult.sign = signF32UI(result);
             break;
         }
         case FMT_DOUBLE: {
@@ -1974,27 +2003,30 @@ int reference_model(
                 sig |= (1UL << 52);
             }
 
-            intermResult->sig64 = sig << (63 - 53);
+            intermResult.sig = mp::uint256_t(sig) << (INTERM_SIG_LENGTH - 2 - 52);
 
-            intermResult->exp = exp;
+            intermResult.exp = exp;
 
-            intermResult->sign = signF64UI(result);
+            intermResult.sign = signF64UI(result);
             break;
         }
         case FMT_QUAD: {
-            mp::uint128_t sig = fracF128UI64(result);
+            mp::uint256_t sig = fracF128UI64(result >> 64);
+            sig <<= 64;
+            sig |= static_cast<uint64_t>(result);
             uint32_t exp = expF128UI64(result >> 64);
 
             // Exp = 0 is a subnorm or a zero
             if (exp != 0) {
                 sig |= ((mp::uint128_t)1) << 112;
             }
-            intermResult->sig64 = static_cast<uint64_t>(sig >> 64);
-            intermResult->sig0 = static_cast<uint64_t>(sig);
+            // intermResult.sig64 = static_cast<uint64_t>(sig >> 64);
+            // intermResult.sig0 = static_cast<uint64_t>(sig);
+            intermResult.sig = sig << (INTERM_SIG_LENGTH - 128);
 
-            intermResult->exp = exp;
+            intermResult.exp = exp;
 
-            intermResult->sign = signF128UI64(result >> 64);
+            intermResult.sign = signF128UI64(result >> 64);
             break;
         }
 
@@ -2004,18 +2036,34 @@ int reference_model(
         }
     }
 
+    // If we took an fma operation, there is now an alignment shift that needs to take place
+    if ((op & ~(0xf)) == OP_FMA) {
+        if (operandFmt == FMT_SINGLE) {
+            intermResult.fma_pre_addition >>= 14;
+        } else if (operandFmt == FMT_DOUBLE) {
+            intermResult.fma_pre_addition >>= 20;
+        } else if (operandFmt == FMT_QUAD) {
+            intermResult.fma_pre_addition >>= 23;
+        } else if (operandFmt == FMT_HALF) {
+            intermResult.fma_pre_addition >>= 8;
+        } else if (operandFmt == FMT_BF16) {
+            intermResult.fma_pre_addition >>= 38;
+        }
+    }
+
     // Post-process the intermediate results:
     // 1. Ensure that subnorms have everything in the right place
     // 2. Then shift off the leading ones
 
     // 1
-    if (intermResult->exp <= 0) {
+    if (intermResult.exp <= 0) {
         // See s_roundPackToF32.c for why we add 1. Our exp is +1 theirs
-        int32_t shift_dist = -intermResult->exp + 1;
+        int32_t shift_dist = -intermResult.exp + 1;
 
         // Unfortunately, softfloat doesn't give us a 192-bit right shift jam
         // but look at softfloat_shiftRightJam128() for reference
 
+        /*
         if (shift_dist < 64) {
             // Everything has a short shift here, most complex case, but look at reference from softfloat
             intermResult->sigExtra = (intermResult->sigExtra >> shift_dist) |
@@ -2042,18 +2090,30 @@ int reference_model(
             intermResult->sig0 = 0;
             intermResult->sig64 = 0;
         }
+        */
 
-        intermResult->exp = 0;
+        // Lets shift right jam ourselves now!
+        mp::uint256_t mask = (mp::uint256_t(1) << shift_dist) - 1;
+        int should_jam = 0;
+        if (intermResult.sig & mask) {
+            should_jam = 1;
+        }
+
+        intermResult.sig >>= shift_dist;
+        intermResult.sig |= should_jam;
+        intermResult.exp = 0;
     }
 
     // 2
     uint8_t shift_amount = (resultFmt == FMT_QUAD) ? 16 : 2;
-    struct uint128 shifted_sig = softfloat_shortShiftLeft128(intermResult->sig64, intermResult->sig0, shift_amount);
+    // struct uint128 shifted_sig = softfloat_shortShiftLeft128(intermResult->sig64, intermResult->sig0, shift_amount);
 
-    intermResult->sig64 = shifted_sig.v64;
-    intermResult->sig0 =
-        shifted_sig.v0 | (intermResult->sigExtra >> (-shift_amount & 63)); // Look at shortShiftLeft source
-    intermResult->sigExtra = intermResult->sigExtra << shift_amount;
+    // intermResult->sig64 = shifted_sig.v64;
+    // intermResult->sig0 =
+    //     shifted_sig.v0 | (intermResult->sigExtra >> (-shift_amount & 63)); // Look at shortShiftLeft source
+    // intermResult->sigExtra = intermResult->sigExtra << shift_amount;
+    intermResult.sig <<= shift_amount;
+    intermResult.sig &= ~mp::uint256_t(0);
 
     return EXIT_SUCCESS;
 }
@@ -2164,11 +2224,11 @@ std::string coverfloat_runtestvector(const std::string &input, bool suppress_err
 
     mp::uint128_t newRes;
     uint8_t newFlags;
-    intermResult_t intermRes;
+    MPIntermResult intermRes;
 
     // Call reference model
 
-    int success = reference_model(op, rm, a, b, c, opFmt, resFmt, newRes, &newFlags, &intermRes);
+    int success = reference_model(op, rm, a, b, c, opFmt, resFmt, newRes, &newFlags, intermRes);
 
     if (success == EXIT_FAILURE) {
         return "";
@@ -2181,8 +2241,6 @@ std::string coverfloat_runtestvector(const std::string &input, bool suppress_err
 
     // char output[512];
 
-    uint16_t newFlags16 = newFlags;
-
     std::stringstream output;
     output << std::hex << std::setfill('0');
     output << std::setw(8) << op << '_';
@@ -2190,11 +2248,13 @@ std::string coverfloat_runtestvector(const std::string &input, bool suppress_err
     output << std::setw(32) << a << '_' << std::setw(32) << b << '_' << std::setw(32) << c << '_';
     output << std::setw(2) << opFmt16 << '_';
     output << std::setw(32) << newRes << '_';
-    output << std::setw(2) << resFmt16 << '_' << std::setw(2) << newFlags16 << '_';
+    output << std::setw(2) << resFmt16 << '_' << std::setw(2) << static_cast<uint16_t>(newFlags) << '_';
     output << std::setw(1) << intermRes.sign << '_';
     output << std::setw(8) << intermRes.exp << '_';
-    output << std::setw(16) << intermRes.sig64 << std::setw(16) << intermRes.sig0 << std::setw(16)
-           << intermRes.sigExtra;
+    output << std::setw(64) << intermRes.sig << '_';
+    output << std::setw(64) << intermRes.fma_pre_addition;
+
+    output << "\n";
 
     // snprintf(
     //     output,

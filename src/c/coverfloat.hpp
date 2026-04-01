@@ -5,18 +5,21 @@
 #include "softfloat/platform.h"
 #include "softfloat/softfloat.h"
 #include "softfloat/specialize.h"
+#include <boost/multiprecision/cpp_int.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string>
 
 #define TEST_VECTOR_WIDTH_BITS 576
-#define COVER_VECTOR_WIDTH_BITS 804
+#define COVER_VECTOR_WIDTH_BITS 1124
 
 #define TEST_VECTOR_WIDTH_HEX 144
-#define COVER_VECTOR_WIDTH_HEX 201
+#define COVER_VECTOR_WIDTH_HEX 281
 
-#define COVER_VECTOR_WIDTH_HEX_WITH_SEPARATORS (COVER_VECTOR_WIDTH_HEX + 11)
+#define COVER_VECTOR_WIDTH_HEX_WITH_SEPARATORS (COVER_VECTOR_WIDTH_HEX + 12)
+
+#define INTERM_SIG_LENGTH 256
 
 // #define TEST_VECTOR_WIDTH_HEX_WITH_SEPARATORS (TEST_VECTOR_WIDTH_HEX + 8)
 // #define MAX_LINE_LEN (TEST_VECTOR_WIDTH_HEX_WITH_SEPARATORS + 10)
@@ -129,6 +132,13 @@ typedef struct {
         x <<= 64;                                                                                                      \
         x |= f.v[0];                                                                                                   \
     } while (0)
+
+struct MPIntermResult {
+    bool sign;
+    int32_t exp;
+    boost::multiprecision::uint256_t sig;
+    boost::multiprecision::uint256_t fma_pre_addition;
+};
 
 inline uint32_t signed_to_unsigned(int32_t in) {
     uint32_t out;
