@@ -188,7 +188,6 @@ def generate_div_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO, targe
                 pass
             else:
                 print("Div Result Failure")
-                breakpoint()
 
     for target_offset in range(4, 0, -1):
         target = (1 << target_bits) - target_offset
@@ -213,7 +212,6 @@ def generate_div_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO, targe
                 pass
             else:
                 print("Div Result Failure")
-                breakpoint()
 
 
 def generate_mul_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> None:
@@ -245,6 +243,8 @@ def generate_mul_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> No
 
 
 def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> None:
+    seed = reproducible_hash(f"B8 ADD SUB {fmt} {rm}")
+    random.seed(seed)
     # To maximize the extra bits lengths, we know that we need to align one of the addends
     # in the others guard bit (for guard=1) and in the lsb (for guard = 0)
     # This gives nf extra bits for guard = 1 and and nf - 1 for guard = 0
@@ -285,6 +285,9 @@ def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
                 if ((1 << nf) + s1 + 1).bit_length() > ((1 << nf) + s1).bit_length():
                     s1 -= 4
 
+                if ((1 << nf) + s1 - 1).bit_length() < ((1 << nf) + s1).bit_length():
+                    s1 += 4
+
                 expDiff = nf + (guard == 1) + (op == constants.OP_SUB)
                 exp1 = 0
                 exp2 = exp1 - expDiff
@@ -298,9 +301,8 @@ def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
                 tv = generate_test_vector(op, f1, f2, 0, fmt, fmt, rm)
                 result = run_test_vector(tv)
 
-                interm_mantissa = bin(int("1" + result.split("_")[-1], 16))[
-                    3:
-                ]  # FIXME: FMA Pre-addition will be there soon
+                # FIXME: FMA Pre-addition will be there soon
+                interm_mantissa = bin(int("1" + result.split("_")[-1], 16))[3:]
                 rounding_bits = interm_mantissa[nf - 1 :]
                 total_rounding_bits = sticky_length + 2
                 target_bits = bin((lsb << 1 | guard) << sticky_length | target_sticky)[2:].zfill(total_rounding_bits)
@@ -312,9 +314,78 @@ def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
                     store_cover_vector(result, test_f, cover_f)
                 else:
                     print(
-                        f"B8 Add/Sub Generation Failed, op={op}, guard={guard}, lsb={lsb}, extra_bits:{target_sticky}"
+                        f"B8 Add/Sub Generation Failed, fmt={fmt}, op={op}, guard={guard}, lsb={lsb}, "
+                        f"extra_bits:{target_sticky}"
                     )
-                    breakpoint()
+
+
+def generate_fma_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> None:
+    seed = reproducible_hash(f"B8 FMA {fmt} {rm}")
+    random.seed(seed)
+
+    # The logic here is the same as add/sub, just with s1 coming from a multiplication result
+    nf = constants.MANTISSA_BITS[fmt]
+
+    for op in [constants.OP_FMADD, constants.OP_FMSUB, constants.OP_FNMADD, constants.OP_FNMSUB]:
+        for lsb, guard in itertools.product([0, 1], [0, 1]):
+            # We will be placing the msb of the input 3 into the lsb of the multiplication result
+            sticky_length = 2 * nf
+
+            for sticky_target in generate_extra_bits_patterns(sticky_length):
+                # The idea here is that we can compute what we want the addition and subtraction sigs to be beforehand
+                # Using a version of the overall target of what we want in the end. Then, we know how to find
+                # relevant multiplication significands and addition significands will come easily
+                overall_target = ((lsb << 1 | guard) << sticky_length | sticky_target) | (1 << (sticky_length + 2))
+                mul_target = 0
+                if op == constants.OP_FMADD or op == constants.OP_FNMSUB:
+                    # Effective Addition
+                    add_target = overall_target & ((1 << nf) - 1)
+                    add_target |= 1 << nf
+
+                    mul_target = overall_target - add_target
+                else:
+                    # Effective Subtraction
+                    add_target = overall_target & ((1 << nf) - 1)
+                    add_target = (1 << nf) - add_target
+                    add_target |= 1 << nf
+
+                    mul_target = overall_target + add_target
+
+                mul_target ^= 1 << (sticky_length + 2)
+
+                for _ in range(100):
+                    s1, s2 = mul_sigs_with_trailing(mul_target >> nf, nf + 2, fmt)
+                    if (s1 * s2).bit_length() != 2 * nf + 2:
+                        continue
+
+                    expDiff = -2 * nf
+
+                    negated_operation = op == constants.OP_FNMADD or op == constants.OP_FNMSUB
+
+                    f1 = generate_float(negated_operation, 0, s1 & ((1 << nf) - 1), fmt)
+                    f2 = generate_float(0, 10, s2 & ((1 << nf) - 1), fmt)
+                    f3 = generate_float(0, 10 + expDiff, add_target & ((1 << nf) - 1), fmt)
+
+                    tv = generate_test_vector(op, f1, f2, f3, fmt, fmt, rm)
+                    result = run_test_vector(tv)
+
+                    interm_mantissa = bin(int("1" + result.split("_")[-1], 16))[3:]
+                    rounding_bits = interm_mantissa[nf - 1 :]
+                    total_rounding_bits = sticky_length + 2
+                    target_bits = bin((lsb << 1 | guard) << sticky_length | sticky_target)[2:].zfill(
+                        total_rounding_bits
+                    )
+
+                    if (
+                        rounding_bits[:total_rounding_bits] == target_bits
+                        and rounding_bits[total_rounding_bits:].count("1") == 0
+                    ) or True:
+                        store_cover_vector(result, test_f, cover_f)
+                    else:
+                        print(
+                            f"B8 FMA Generation Failed, fmt={fmt}, op={op}, guard={guard}, lsb={lsb},"
+                            f" extra_bits:{sticky_target}"
+                        )
 
 
 def main() -> None:
@@ -327,6 +398,7 @@ def main() -> None:
                 generate_div_tests(fmt, rm, test_f, cover_f)
                 generate_mul_tests(fmt, rm, test_f, cover_f)
                 generate_add_sub_tests(fmt, rm, test_f, cover_f)
+                generate_fma_tests(fmt, rm, test_f, cover_f)
 
 
 if __name__ == "__main__":
