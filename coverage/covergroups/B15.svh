@@ -128,6 +128,7 @@ covergroup B15_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-2 * F16_M_BITS - 1  : -2 * F16_M_BITS + 1]};
         bins mid_shift[]     = {[-2                   :  2                 ]};
         bins big_pos_shift[] = {[ F16_M_BITS - 2      :  F16_M_BITS        ]};
+        bins other_shift     = default;
 
     }
 
@@ -137,6 +138,8 @@ covergroup B15_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-2 * BF16_M_BITS - 1  : -2 * BF16_M_BITS + 1]};
         bins mid_shift[]     = {[-2                    :  2                  ]};
         bins big_pos_shift[] = {[ BF16_M_BITS - 2      :  BF16_M_BITS        ]};
+        bins other_shift     = default;
+
     }
 
     F32_madd_shift: coverpoint $signed(get_product_exponent(CFI.a, CFI.b, FMT_SINGLE) - int'(CFI.c[F32_E_UPPER : F32_E_LOWER])) {
@@ -145,6 +148,8 @@ covergroup B15_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-2 * F32_M_BITS - 1  : -2 * F32_M_BITS + 1]};
         bins mid_shift[]     = {[-2                   :  2                 ]};
         bins big_pos_shift[] = {[ F32_M_BITS - 2      :  F32_M_BITS        ]};
+        bins other_shift     = default;
+
     }
 
     F64_madd_shift: coverpoint $signed(get_product_exponent(CFI.a, CFI.b, FMT_DOUBLE) - int'(CFI.c[F64_E_UPPER : F64_E_LOWER])) {
@@ -153,6 +158,8 @@ covergroup B15_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-2 * F64_M_BITS - 1  : -2 * F64_M_BITS + 1]};
         bins mid_shift[]     = {[-2                   :  2                 ]};
         bins big_pos_shift[] = {[ F64_M_BITS - 2      :  F64_M_BITS        ]};
+        bins other_shift     = default;
+
     }
 
     F128_madd_shift: coverpoint $signed(get_product_exponent(CFI.a, CFI.b, FMT_QUAD) - int'(CFI.c[F128_E_UPPER : F128_E_LOWER])) {
@@ -161,6 +168,8 @@ covergroup B15_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-2 * F128_M_BITS - 1  : -2 * F128_M_BITS + 1]};
         bins mid_shift[]     = {[-2                    :  2                  ]};
         bins big_pos_shift[] = {[ F128_M_BITS - 2      :  F128_M_BITS        ]};
+        bins other_shift     = default;
+
     }
 
 

@@ -121,6 +121,7 @@ covergroup B11_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-F16_M_BITS     : -F16_M_BITS + 2]};
         bins mid_shift[]     = {[-2              :  2             ]};
         bins big_pos_shift[] = {[ F16_M_BITS - 2 :  F16_M_BITS    ]};
+        bins other_shift     = default;
 
     }
 
@@ -130,6 +131,7 @@ covergroup B11_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-BF16_M_BITS     : -BF16_M_BITS + 2]};
         bins mid_shift[]     = {[-2               :  2              ]};
         bins big_pos_shift[] = {[ BF16_M_BITS - 2 :  BF16_M_BITS    ]};
+        bins other_shift     = default;
 
     }
 
@@ -139,6 +141,7 @@ covergroup B11_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-F32_M_BITS     : -F32_M_BITS + 2]};
         bins mid_shift[]     = {[-2              :  2             ]};
         bins big_pos_shift[] = {[ F32_M_BITS - 2 :  F32_M_BITS    ]};
+        bins other_shift     = default;
 
     }
 
@@ -148,6 +151,7 @@ covergroup B11_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-F64_M_BITS     : -F64_M_BITS + 2]};
         bins mid_shift[]     = {[-2              :  2             ]};
         bins big_pos_shift[] = {[ F64_M_BITS - 2 :  F64_M_BITS    ]};
+        bins other_shift     = default;
 
     }
 
@@ -157,6 +161,7 @@ covergroup B11_cg (virtual coverfloat_interface CFI);
         bins big_neg_shift[] = {[-F128_M_BITS     : -F128_M_BITS + 2]};
         bins mid_shift[]     = {[-2               :  2              ]};
         bins big_pos_shift[] = {[ F128_M_BITS - 2 :  F128_M_BITS    ]};
+        bins other_shift     = default;
 
     }
 
