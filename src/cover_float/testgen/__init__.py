@@ -8,5 +8,6 @@ import cover_float.testgen.B12 as B12
 import cover_float.testgen.B13 as B13
 import cover_float.testgen.B14 as B14
 import cover_float.testgen.B15 as B15
+import cover_float.testgen.B21 as B21
 
-__all__ = ["B1", "B2", "B3", "B9", "B10", "B11", "B12", "B13", "B14", "B15"]
+__all__ = ["B1", "B2", "B3", "B9", "B10", "B11", "B12", "B13", "B14", "B15", "B21"]
