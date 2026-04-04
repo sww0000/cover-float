@@ -60,14 +60,16 @@ def testgen() -> None:
         auto_parse("B1", args.output_dir)
         tg.B3.main()
         auto_parse("B3", args.output_dir)
+        tg.B8.main()
+        auto_parse("B8", args.output_dir)
         tg.B9.main()
         auto_parse("B9", args.output_dir)
         tg.B10.main()
         auto_parse("B10", args.output_dir)
-        tg.B12.main()
-        auto_parse("B12", args.output_dir)
         tg.B11.main()
         auto_parse("B11", args.output_dir)
+        tg.B12.main()
+        auto_parse("B12", args.output_dir)
         tg.B14.main()
         auto_parse("B14", args.output_dir)
         tg.B15.main()
@@ -79,6 +81,9 @@ def testgen() -> None:
         if "B3" in args.models:
             tg.B3.main()
             auto_parse("B3", args.output_dir)
+        if "B8" in args.models:
+            tg.B8.main()
+            auto_parse("B8", args.output_dir)
         if "B9" in args.models:
             tg.B9.main()
             auto_parse("B9", args.output_dir)
