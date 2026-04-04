@@ -7,6 +7,7 @@ from typing import Optional, TextIO
 
 import cover_float.common.constants as constants
 from cover_float.common.util import (
+    bezout_inverse,
     extract_rounding_info,
     generate_float,
     generate_test_vector,
@@ -16,37 +17,6 @@ from cover_float.common.util import (
 from cover_float.reference import run_and_store_test_vector, run_test_vector, store_cover_vector
 
 # Test Plan: Add/Sub (effective ops), Mul, FMA (effective ops), DIV, SQRT, then Converts are easy
-
-
-def bezout_inverse(x: int, base: int) -> int:
-    # Find the inverse of an element using the Euclidean algorithm and applying Bezout's identity
-    # The euclidean algorithm says: gcd(x, y) = gcd(y, x % y) for x > y
-    # Bezout's identity says that there exists A, B in Z such that Ax + By = gcd(x, y)
-    # With proper book keeping, we can find these X and Y, and noticing that
-    # Ax + By = 1 when x, y are relatively prime (as x and base are assumed to be),
-    # Ax = 1 - By implies Ax = 1 (mod y) and thus A inverts X in base y
-
-    # Algorithm taken from https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm
-    r = [base, x]
-    s = [1, 0]
-    t = [0, 1]
-
-    while r[-1] != 0:
-        q = r[-2] // r[-1]
-        r.append(r[-2] - q * r[-1])
-        s.append(s[-2] - q * s[-1])
-        t.append(t[-2] - q * t[-1])
-
-    gcd = r[-2]
-    _bezout_A = s[-2]
-    bezout_B = t[-2]
-
-    if gcd != 1:
-        return -1
-
-    # We have bezout_A(base) + bezout_B(x) = gcd
-    # So, as shown above, bezout_B inverts x
-    return bezout_B % base
 
 
 def mul_sigs_with_trailing(target: int, bit_length: int, fmt: str) -> tuple[int, int]:
@@ -135,6 +105,28 @@ def generate_extra_bits_patterns(length: int) -> list[int]:
     return target_extra_bits
 
 
+def sign_lsb_guard() -> list[tuple[int, int, int]]:
+    return list(itertools.product([0, 1], [0, 1], [0, 1]))
+
+
+def generate_exponents(fmt: str, *, subtract: bool = False) -> tuple[int, int]:
+    exp_min, exp_max = constants.BIASED_EXP[fmt]
+
+    exp_min -= constants.BIAS[fmt]
+    exp_max -= constants.BIAS[fmt]
+
+    exp1 = random.randint(exp_min, exp_max)
+    exp2 = random.randint(exp_min, exp_max)
+    score = exp1 + exp2 if not subtract else exp1 - exp2
+
+    while not exp_min < score < exp_max:
+        exp1 = random.randint(exp_min, exp_max)
+        exp2 = random.randint(exp_min, exp_max)
+        score = exp1 + exp2 if not subtract else exp1 - exp2
+
+    return exp1, exp2
+
+
 def generate_div_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO, target_bits: Optional[int] = None) -> None:
     seed = reproducible_hash(f"B8 DIV {fmt} {rm}")
     random.seed(seed)
@@ -144,7 +136,7 @@ def generate_div_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO, targe
         target_bits = nf - 2
 
     for target in range(1, 4):
-        for lsb, guard in itertools.product(range(2), range(2)):
+        for sign, lsb, guard in sign_lsb_guard():
             maybe_result = divideSetRounding(lsb, guard, target, target_bits, fmt)
             if not maybe_result:
                 print(f"Failure for lsb={lsb}, guard={guard}, sticky={target:b}")
@@ -152,21 +144,25 @@ def generate_div_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO, targe
 
             s1, s2 = maybe_result
 
-            f1 = generate_float(0, 0, s1 & ((1 << nf) - 1), fmt)
-            f2 = generate_float(0, 0, s2 & ((1 << nf) - 1), fmt)
+            sign1 = random.randint(0, 1)
+            sign2 = sign1 ^ sign
+
+            exp1, exp2 = generate_exponents(fmt, subtract=True)
+
+            f1 = generate_float(sign1, exp1, s1 & ((1 << nf) - 1), fmt)
+            f2 = generate_float(sign2, exp2, s2 & ((1 << nf) - 1), fmt)
 
             tv = generate_test_vector(constants.OP_DIV, f1, f2, 0, fmt, fmt)
             result = run_test_vector(tv)
             info = extract_rounding_info(result)
             if check_div_result(result, target, target_bits) and info["Guard"] == guard and info["LSB"] == lsb:
                 store_cover_vector(result, test_f, cover_f)
-                pass
             else:
                 print("Div Result Failure")
 
     for target_offset in range(4, 0, -1):
         target = (1 << target_bits) - target_offset
-        for lsb, guard in itertools.product(range(2), range(2)):
+        for sign, lsb, guard in sign_lsb_guard():
             maybe_result = divideSetRounding(lsb, guard, target, target_bits, fmt)
             if not maybe_result:
                 print(f"Failure for lsb={lsb}, guard={guard}, sticky={target:b}")
@@ -174,17 +170,19 @@ def generate_div_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO, targe
 
             s1, s2 = maybe_result
 
-            f1 = generate_float(0, 0, s1 & ((1 << nf) - 1), fmt)
-            f2 = generate_float(0, 0, s2 & ((1 << nf) - 1), fmt)
+            sign1 = random.randint(0, 1)
+            sign2 = sign1 ^ sign
+
+            exp1, exp2 = generate_exponents(fmt, subtract=True)
+
+            f1 = generate_float(sign1, exp1, s1 & ((1 << nf) - 1), fmt)
+            f2 = generate_float(sign2, exp2, s2 & ((1 << nf) - 1), fmt)
 
             tv = generate_test_vector(constants.OP_DIV, f1, f2, 0, fmt, fmt, rm)
             result = run_test_vector(tv)
             info = extract_rounding_info(result)
-            if (
-                check_div_result(result, target, target_bits) and info["Guard"] == guard and info["LSB"] == lsb
-            ) or fmt == "03":  # FIXME
+            if check_div_result(result, target, target_bits) and info["Guard"] == guard and info["LSB"] == lsb:
                 store_cover_vector(result, test_f, cover_f)
-                pass
             else:
                 print("Div Result Failure")
 
@@ -199,7 +197,7 @@ def generate_mul_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> No
     nf = constants.MANTISSA_BITS[fmt]
     target_extra_bits = generate_extra_bits_patterns(nf)
 
-    for lsb, guard in itertools.product([0, 1], [0, 1]):
+    for sign, lsb, guard in sign_lsb_guard():
         for target_sticky in target_extra_bits:
             target = (lsb << 1 | guard) << nf | target_sticky
 
@@ -209,12 +207,19 @@ def generate_mul_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> No
                 if (s1 * s2).bit_length() != 2 * nf + 2:
                     continue
 
-                # TODO: Exponent Randomization
-                f1 = generate_float(0, 0, s1 & ((1 << nf) - 1), fmt)
-                f2 = generate_float(0, 0, s2 & ((1 << nf) - 1), fmt)
+                sign1 = random.randint(0, 1)
+                sign2 = sign1 ^ sign
+
+                exp1, exp2 = generate_exponents(fmt)
+
+                f1 = generate_float(sign1, exp1, s1 & ((1 << nf) - 1), fmt)
+                f2 = generate_float(sign2, exp2, s2 & ((1 << nf) - 1), fmt)
 
                 tv = generate_test_vector(constants.OP_MUL, f1, f2, 0, fmt, fmt, rm)
                 run_and_store_test_vector(tv, test_f, cover_f)
+                break
+            else:
+                print(f"B8 Mul Generation Failed: fmt={fmt}, lsb={lsb}, guard={guard}, extra_bits={target_sticky}")
 
 
 def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> None:
@@ -227,7 +232,7 @@ def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
     nf = constants.MANTISSA_BITS[fmt]
 
     for op in [constants.OP_ADD, constants.OP_SUB]:
-        for lsb, guard in itertools.product([0, 1], [0, 1]):
+        for sign, lsb, guard in sign_lsb_guard():
             if guard == 1:  # noqa: SIM108
                 sticky_length = nf + (op == constants.OP_SUB)
             else:  # guard == 0
@@ -257,9 +262,9 @@ def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
                 if guard == 0 and op != constants.OP_SUB:
                     s1 ^= 1
 
+                # Edge case handling (overflowing into another exponent)
                 if ((1 << nf) + s1 + 1).bit_length() > ((1 << nf) + s1).bit_length():
                     s1 -= 4
-
                 if ((1 << nf) + s1 - 1).bit_length() < ((1 << nf) + s1).bit_length():
                     s1 += 4
 
@@ -267,8 +272,8 @@ def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
                 exp1 = 0
                 exp2 = exp1 - expDiff
 
-                f1 = generate_float(0, exp1, s1, fmt)
-                f2 = generate_float(0, exp2, s2, fmt)
+                f1 = generate_float(sign, exp1, s1, fmt)
+                f2 = generate_float(sign, exp2, s2, fmt)
 
                 if random.random() < 1 and op == constants.OP_ADD:
                     f1, f2 = f2, f1
@@ -302,7 +307,7 @@ def generate_fma_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> No
     nf = constants.MANTISSA_BITS[fmt]
 
     for op in [constants.OP_FMADD, constants.OP_FMSUB, constants.OP_FNMADD, constants.OP_FNMSUB]:
-        for lsb, guard in itertools.product([0, 1], [0, 1]):
+        for sign, lsb, guard in sign_lsb_guard():
             # We will be placing the msb of the input 3 into the lsb of the multiplication result
             sticky_length = 2 * nf
 
@@ -335,11 +340,29 @@ def generate_fma_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> No
 
                     expDiff = -2 * nf
 
-                    negated_operation = op == constants.OP_FNMADD or op == constants.OP_FNMSUB
+                    prodSign = sign
+                    addSign = sign
 
-                    f1 = generate_float(negated_operation, 0, s1 & ((1 << nf) - 1), fmt)
-                    f2 = generate_float(0, 10, s2 & ((1 << nf) - 1), fmt)
-                    f3 = generate_float(0, 10 + expDiff, add_target & ((1 << nf) - 1), fmt)
+                    signA = random.randint(0, 1)
+                    signB = signA ^ prodSign
+
+                    negated_operation = op == constants.OP_FNMADD or op == constants.OP_FNMSUB
+                    signA ^= negated_operation
+
+                    exp_min, exp_max = constants.BIASED_EXP[fmt]
+                    exp_min -= constants.BIAS[fmt]
+                    exp_max -= constants.BIAS[fmt]
+
+                    exp1, exp2 = generate_exponents(fmt)
+                    addExp = exp1 + exp2 + expDiff
+
+                    while not exp_min <= addExp <= exp_max:
+                        exp1, exp2 = generate_exponents(fmt)
+                        addExp = exp1 + exp2 + expDiff
+
+                    f1 = generate_float(signA, exp1, s1 & ((1 << nf) - 1), fmt)
+                    f2 = generate_float(signB, exp2, s2 & ((1 << nf) - 1), fmt)
+                    f3 = generate_float(addSign, addExp, add_target & ((1 << nf) - 1), fmt)
 
                     tv = generate_test_vector(op, f1, f2, f3, fmt, fmt, rm)
                     result = run_test_vector(tv)
@@ -357,6 +380,7 @@ def generate_fma_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> No
                         and rounding_bits[total_rounding_bits:].count("1") == 0
                     ):
                         store_cover_vector(result, test_f, cover_f)
+                        break
                     else:
                         print(
                             f"B8 FMA Generation Failed, fmt={fmt}, op={op}, guard={guard}, lsb={lsb},"
@@ -378,7 +402,7 @@ def generate_convert_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
         else:
             target_nf = constants.INT_MAX_EXPS[target_fmt]
 
-        if nf - target_nf <= 0:
+        if nf - target_nf <= 0 and target_fmt not in constants.INT_FMTS:
             # Not an interesting conversion to round
             continue
 
@@ -393,14 +417,17 @@ def generate_convert_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
         maximal_overhang = nf - target_nf if target_fmt in constants.FLOAT_FMTS else nf - 1
         op = constants.OP_CFF if target_fmt in constants.FLOAT_FMTS else constants.OP_CFI
 
-        for lsb, guard in itertools.product([0, 1], [0, 1]):
+        for sign, lsb, guard in sign_lsb_guard():
+            if target_fmt in constants.INT_FMTS and not constants.INT_SIGNED[target_fmt] and sign:
+                continue
+
             for extra_bits in generate_extra_bits_patterns(maximal_overhang - 2):
                 target = ((lsb << 1) | guard) << (maximal_overhang - 2) | extra_bits
 
                 sig = random.getrandbits(nf - maximal_overhang - 1) << (maximal_overhang + 1) | target
                 exp = random.randint(max(exp_min, target_exp_min), min(exp_max, target_exp_max))
 
-                f = generate_float(0, exp, sig, fmt)
+                f = generate_float(sign, exp, sig, fmt)
                 tv = generate_test_vector(op, f, 0, 0, fmt, target_fmt, rm)
                 result = run_test_vector(tv)
 
@@ -428,11 +455,18 @@ def generate_convert_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
             # Uninteresting case
             continue
 
-        for lsb, guard in itertools.product([0, 1], [0, 1]):
+        for sign, lsb, guard in sign_lsb_guard():
+            if sign and not constants.INT_SIGNED[from_fmt]:
+                continue
+
             for extra_bits in generate_extra_bits_patterns(maximal_overhang - 2):
                 target = ((lsb << 1) | guard) << (maximal_overhang - 2) | extra_bits
                 integer = random.getrandbits(from_bits - maximal_overhang - 1) << (maximal_overhang + 1) | target
                 integer |= 1 << (from_bits - 1)
+
+                if sign:
+                    integer *= 1
+                    integer &= (1 << constants.INT_SIZES[from_fmt]) - 1  # Bring it to 2s complement representation
 
                 tv = generate_test_vector(constants.OP_CIF, integer, 0, 0, from_fmt, fmt, rm)
                 result = run_test_vector(tv)
@@ -459,14 +493,12 @@ def main() -> None:
         Path("tests/covervectors/B8_cv.txt").open("w") as cover_f,
     ):
         for fmt in constants.FLOAT_FMTS:
-            print(f"B8 fmt={fmt}", end="\r")
             for rm in constants.ROUNDING_MODES:
                 generate_div_tests(fmt, rm, test_f, cover_f)
                 generate_mul_tests(fmt, rm, test_f, cover_f)
                 generate_add_sub_tests(fmt, rm, test_f, cover_f)
                 generate_fma_tests(fmt, rm, test_f, cover_f)
                 generate_convert_tests(fmt, rm, test_f, cover_f)
-        print("\x1b[2K", end="\r")
         print("B8 Generated :)")
 
 
