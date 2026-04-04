@@ -97,7 +97,7 @@ def add_sub_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
             tv = generate_test_vector(op, f1, f2, 0, fmt, fmt, constants.ROUND_MAX)
             result = run_test_vector(tv)
 
-            pre_rounding_mantissa = int("1" + result.split("_")[-1], 16)
+            pre_rounding_mantissa = int("1" + result.split("_")[-2], 16)
             # Mask off 0b, leading one, and significant bits
             rounding_bits = bin(pre_rounding_mantissa)[2 + 1 + nf :]
             # Only get the remaining rounding bits
@@ -173,7 +173,7 @@ def mul_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
             tv = generate_test_vector(constants.OP_MUL, f1, f2, 0, fmt, fmt, constants.ROUND_MAX)
             result = run_test_vector(tv)
 
-            pre_rounding_mantissa = int("1" + result.split("_")[-1], 16)
+            pre_rounding_mantissa = int("1" + result.split("_")[-2], 16)
             expected_shift_left = len(bin(sig_a * sig_b)[2:]) == (2 * nf + 2)
             # Mask off 0b, leading one, and significant bits
             rounding_bits = bin(pre_rounding_mantissa)[2 + 1 + nf :]
@@ -270,8 +270,6 @@ def two_ones_multiplicands(fmt: str) -> dict[int, tuple[int, int]]:
 
 
 STICKY_LIMITS = {
-    constants.FMT_HALF: 18,
-    constants.FMT_SINGLE: 37,
     constants.FMT_DOUBLE: 72,
     constants.FMT_QUAD: 127,
 }
@@ -339,6 +337,11 @@ def multiplicand_generator(
                 return (f1, f2)
 
     return None
+
+
+@functools.cache
+def cached_factorint(target: int) -> dict[int, int]:
+    return factorint(target)
 
 
 def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
@@ -455,7 +458,7 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
                 tv = generate_test_vector(op, in1, in2, in3, fmt, fmt, constants.ROUND_MAX)
                 result = run_test_vector(tv)
 
-                interm_mantissa = bin(int("1" + result.split("_")[-1], 16))[3:]
+                interm_mantissa = bin(int("1" + result.split("_")[-2], 16))[3:]
                 actual_extra_bits = interm_mantissa[constants.MANTISSA_BITS[fmt] :]
                 expected_extra_bits = bin(target)[2:].zfill(constants.MANTISSA_BITS[fmt] + 1)
 
@@ -513,13 +516,13 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
                 tv = generate_test_vector(op, floatA, floatB, floatC, fmt, fmt, constants.ROUND_MAX)
                 result = run_test_vector(tv)
 
-                interm_mantissa = bin(int("1" + result.split("_")[-1], 16))[3:]
+                interm_mantissa = bin(int("1" + result.split("_")[-2], 16))[3:]
                 actual_extra_bits = interm_mantissa[constants.MANTISSA_BITS[fmt] :]
                 placement = actual_extra_bits.rfind("1")
 
                 if (
                     ((sigA * sigB).bit_length() != 2 * constants.MANTISSA_BITS[fmt] + 2 and not effective_subtraction)
-                    or (placement != overhang_extra and overhang_extra <= STICKY_LIMITS.get(fmt, 1000))
+                    or (placement != overhang_extra)  # and overhang_extra <= STICKY_LIMITS.get(fmt, 1000))
                     or actual_extra_bits.count("1") != 1
                 ):
                     continue
@@ -545,9 +548,9 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
         placements: list[int] = []
 
         for target_placement in range(1, 2 * constants.MANTISSA_BITS[fmt]):
-            if target_placement > STICKY_LIMITS.get(fmt, 1000):
-                # The things that are possible within what softfloat gives us
-                break
+            # if target_placement > STICKY_LIMITS.get(fmt, 1000):
+            #     # The things that are possible within what softfloat gives us
+            #     break
 
             print(
                 f"{fmt} target_placement: {target_placement}/"
@@ -559,9 +562,12 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
             shift_amount = max(3, target_placement - constants.MANTISSA_BITS[fmt] + 1)
             target_location = target_placement - shift_amount
 
-            attempted_sigs = multiplicand_generator(
-                target_location, shift_amount, effective_subtraction, constants.MANTISSA_BITS[fmt]
-            )
+            if target_placement < STICKY_LIMITS.get(fmt, 1000):
+                attempted_sigs = multiplicand_generator(
+                    target_location, shift_amount, effective_subtraction, constants.MANTISSA_BITS[fmt]
+                )
+            else:
+                attempted_sigs = None
 
             if attempted_sigs is None:
                 if not effective_subtraction:
@@ -572,9 +578,27 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
                         exp_diff = target_placement - lowest_one + constants.MANTISSA_BITS[fmt] + 1
 
                         if exp_diff > constants.MANTISSA_BITS[fmt]:
+                            # print("attempted sigs failed, no recourse :(")
                             continue
                 else:
-                    continue
+                    # 1st attempt all ones in the significand
+                    target = (1 << 2 * constants.MANTISSA_BITS[fmt] + 1) - 1
+                    factors = cached_factorint(target)
+                    f1, f2 = factors_to_bit_width(factors, target, constants.MANTISSA_BITS[fmt] + 1)
+
+                    if f1 * f2 == target:
+                        sigA, sigB = f1, f2
+                        one_location = 2 * constants.MANTISSA_BITS[fmt]  # After the decimal point
+                    else:
+                        sigA = (1 << constants.MANTISSA_BITS[fmt] + 1) - 2
+                        sigB = (1 << constants.MANTISSA_BITS[fmt]) + 1
+                        # These are the second best thing we can do
+                        one_location = 2 * constants.MANTISSA_BITS[fmt] - 1
+
+                    exp_diff = target_placement - one_location + constants.MANTISSA_BITS[fmt] + 1
+
+                    if exp_diff > constants.MANTISSA_BITS[fmt]:
+                        continue
             else:
                 sigA, sigB = attempted_sigs
                 exp_diff = shift_amount
@@ -619,13 +643,14 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
             tv = generate_test_vector(op, floatA, floatB, floatC, fmt, fmt, constants.ROUND_MAX)
             result = run_test_vector(tv)
 
-            interm_mantissa = bin(int("1" + result.split("_")[-1], 16))[3:]
+            interm_mantissa = bin(int("1" + result.split("_")[-2], 16))[3:]
             actual_extra_bits = interm_mantissa[constants.MANTISSA_BITS[fmt] :]
             placement = actual_extra_bits.rfind("1")
 
             if (
-                placement != target_placement and target_placement <= STICKY_LIMITS.get(fmt, 1000)
+                placement != target_placement  # and target_placement <= STICKY_LIMITS.get(fmt, 1000)
             ) or actual_extra_bits.count("1") != 1:
+                breakpoint()
                 continue
             elif placement not in placements:
                 placements.append(placement)
@@ -664,7 +689,7 @@ def convert_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
 
             tv = generate_test_vector(constants.OP_CFF, f, 0, 0, from_fmt, fmt, constants.ROUND_MAX)
             result = run_test_vector(tv)
-            interm_mantissa = bin(int("1" + result.split("_")[-1], 16))[3:][:from_nf]
+            interm_mantissa = bin(int("1" + result.split("_")[-2], 16))[3:][:from_nf]
             rounding_bits = interm_mantissa[nf:]
 
             if rounding_bits == bin(extra_bits)[2:].zfill(from_nf - nf):
@@ -696,17 +721,11 @@ def convert_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
 
             tv = generate_test_vector(constants.OP_CFI, f, 0, 0, fmt, to_fmt, constants.ROUND_MAX)
             result = run_test_vector(tv)
-            interm_mantissa = bin(int("1" + result.split("_")[-1], 16))[3:]
+            interm_mantissa = bin(int("1" + result.split("_")[-2], 16))[3:]
             rounding_bits = interm_mantissa[to_bits : to_bits + frac_bits]
 
             if rounding_bits == bin(frac_part)[2:].zfill(frac_bits):
                 store_cover_vector(result, test_f, cover_f)
-            elif (
-                (to_fmt in [constants.FMT_UINT, constants.FMT_INT] and extra_bit >= 12)
-                or (to_fmt == constants.FMT_LONG and fmt == constants.FMT_QUAD and extra_bit >= 63)
-                or (to_fmt == constants.FMT_ULONG and fmt == constants.FMT_QUAD and extra_bit >= 62)
-            ):
-                store_cover_vector(result, test_f, cover_f)  # We only record this many extra bits
             else:
                 print(f"CFI Generation Failure From: {fmt}, To: {to_fmt}, Extra-Bits: {frac_part:b}")
 
@@ -730,25 +749,19 @@ def convert_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
 
             tv = generate_test_vector(constants.OP_CIF, sig, 0, 0, from_fmt, fmt, constants.ROUND_MAX)
             result = run_test_vector(tv)
-            interm_mantissa = bin(int("1" + result.split("_")[-1], 16))[3:]
+            interm_mantissa = bin(int("1" + result.split("_")[-2], 16))[3:]
             rounding_bits = interm_mantissa[nf:]
 
             if rounding_bits.count("1") == 1 and rounding_bits.find("1") == extra_bit:
                 store_cover_vector(result, test_f, cover_f)
             elif (
-                (from_fmt == constants.FMT_ULONG and fmt == constants.FMT_SINGLE and extra_bit > 38)
-                or (from_fmt == constants.FMT_UINT and fmt == constants.FMT_HALF and extra_bit > 19)
-                or (from_fmt == constants.FMT_ULONG and fmt == constants.FMT_HALF and extra_bit > 51)
-                or (
-                    from_fmt in [constants.FMT_INT, constants.FMT_UINT]
-                    and fmt == constants.FMT_BF16
-                    and extra_bit + constants.MANTISSA_BITS[fmt] >= constants.MANTISSA_BITS[constants.FMT_SINGLE]
-                )
-                or (
-                    from_fmt in [constants.FMT_LONG, constants.FMT_ULONG]
-                    and fmt == constants.FMT_BF16
-                    and extra_bit + constants.MANTISSA_BITS[fmt] >= constants.MANTISSA_BITS[constants.FMT_DOUBLE]
-                )
+                from_fmt in [constants.FMT_INT, constants.FMT_UINT]
+                and fmt == constants.FMT_BF16
+                and extra_bit + constants.MANTISSA_BITS[fmt] >= constants.MANTISSA_BITS[constants.FMT_SINGLE]
+            ) or (
+                from_fmt in [constants.FMT_LONG, constants.FMT_ULONG]
+                and fmt == constants.FMT_BF16
+                and extra_bit + constants.MANTISSA_BITS[fmt] >= constants.MANTISSA_BITS[constants.FMT_DOUBLE]
             ):
                 store_cover_vector(result, test_f, cover_f)  # Softfloat quirk makes it not track correctly here
             else:
