@@ -106,28 +106,23 @@ covergroup B10_cg (virtual coverfloat_interface CFI);
      ************************************************************************/
 
     `ifdef COVER_F16
-        B10_F16_addsub_shift:
-            cross FP_addsub_ops, F16_exp_diff, F16_result_fmt;
+        B10_F16_addsub_shift: cross  FP_addsub_ops, F16_exp_diff,  F16_result_fmt;
     `endif
 
     `ifdef COVER_BF16
-        B10_BF16_addsub_shift:
-            cross FP_addsub_ops, BF16_exp_diff, BF16_result_fmt;
+        B10_BF16_addsub_shift: cross FP_addsub_ops, BF16_exp_diff, BF16_result_fmt;
     `endif
 
     `ifdef COVER_F32
-        B10_F32_addsub_shift:
-            cross FP_addsub_ops, F32_exp_diff, F32_result_fmt;
+        B10_F32_addsub_shift: cross  FP_addsub_ops, F32_exp_diff,  F32_result_fmt;
     `endif
 
     `ifdef COVER_F64
-        B10_F64_addsub_shift:
-            cross FP_addsub_ops, F64_exp_diff, F64_result_fmt;
+        B10_F64_addsub_shift: cross  FP_addsub_ops, F64_exp_diff,  F64_result_fmt;
     `endif
 
     `ifdef COVER_F128
-        B10_F128_addsub_shift:
-            cross FP_addsub_ops, F128_exp_diff, F128_result_fmt;
+        B10_F128_addsub_shift: cross FP_addsub_ops, F128_exp_diff, F128_result_fmt;
     `endif
 
 endgroup
