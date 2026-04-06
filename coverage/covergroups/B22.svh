@@ -27,8 +27,32 @@ covergroup B22_cg (virtual coverfloat_interface CFI);
         bins f128 = {1};
     }
 
-    // Sign coverpoint
-    operand_sign: coverpoint $signed(get_sign(CFI.a, CFI.operandFmt)){
+    // Sign coverpoints
+    F16_sign: coverpoint CFI.result[15] {
+        type_option.weight = 0;
+        bins pos = {0};
+        bins neg = {1};
+    }
+
+    BF16_sign: coverpoint CFI.result[15] {
+        type_option.weight = 0;
+        bins pos = {0};
+        bins neg = {1};
+    }
+
+    F32_sign: coverpoint CFI.result[31] {
+        type_option.weight = 0;
+        bins pos = {0};
+        bins neg = {1};
+    }
+
+    F64_sign: coverpoint CFI.result[63] {
+        type_option.weight = 0;
+        bins pos = {0};
+        bins neg = {1};
+    }
+
+    F128_sign: coverpoint CFI.result[127] {
         type_option.weight = 0;
         bins pos = {0};
         bins neg = {1};
@@ -69,76 +93,66 @@ covergroup B22_cg (virtual coverfloat_interface CFI);
     //Crosses
     //FMT_HALF
     `ifdef COVER_F16
-        `ifdef COVER_INT
             B22_F16_INT:
-                cross F16_input_fmt, operand_sign, result_int32_fmt, exponent_dif_int32;
-        `endif
+                cross F16_input_fmt, F16_sign, result_int32_fmt, exponent_dif_int32;
     `endif
 
     `ifdef COVER_F16
-        `ifdef COVER_INT
+        `ifdef COVER_LONG
             B22_F16_LONG:
-                cross F16_input_fmt, operand_sign, result_long64_fmt, exponent_dif_long64;
+                cross F16_input_fmt, F16_sign, result_long64_fmt, exponent_dif_long64;
         `endif
     `endif
 
     //FMT_BF16
     `ifdef COVER_BF16
-        `ifdef COVER_INT
             B22_BF16_INT:
-                cross BF16_input_fmt, operand_sign, result_int32_fmt, exponent_dif_int32;
-        `endif
+                cross BF16_input_fmt, BF16_sign, result_int32_fmt, exponent_dif_int32;
     `endif
 
     `ifdef COVER_BF16
-        `ifdef COVER_INT
+        `ifdef COVER_LONG
             B22_BF16_LONG:
-                cross BF16_input_fmt, operand_sign, result_long64_fmt, exponent_dif_long64;
+                cross BF16_input_fmt, BF16_sign, result_long64_fmt, exponent_dif_long64;
         `endif
     `endif
 
     //FMT_SINGLE
     `ifdef COVER_F32
-        `ifdef COVER_INT
             B22_F32_INT:
-                cross F32_input_fmt, operand_sign, result_int32_fmt, exponent_dif_int32;
-        `endif
+                cross F32_input_fmt, F32_sign, result_int32_fmt, exponent_dif_int32;
     `endif
 
     `ifdef COVER_F32
         `ifdef COVER_LONG
             B22_F32_LONG:
-                cross F32_input_fmt, operand_sign, result_long64_fmt, exponent_dif_long64;
+                cross F32_input_fmt, F32_sign, result_long64_fmt, exponent_dif_long64;
         `endif
     `endif
 
     //FMT_DOUBLE
     `ifdef COVER_F64
-        `ifdef COVER_INT
             B22_F64_INT:
-                cross F64_input_fmt, operand_sign, result_int32_fmt, exponent_dif_int32;
-        `endif
+                cross F64_input_fmt, F64_sign, result_int32_fmt, exponent_dif_int32;
     `endif
 
     `ifdef COVER_F64
         `ifdef COVER_LONG
             B22_F64_LONG:
-                cross F64_input_fmt, operand_sign, result_long64_fmt, exponent_dif_long64;
+                cross F64_input_fmt, F64_sign, result_long64_fmt, exponent_dif_long64;
         `endif
     `endif
 
     //FMT_QUAD
     `ifdef COVER_F128
-        `ifdef COVER_INT
             B22_F128_INT:
-                cross F128_input_fmt, operand_sign, result_int32_fmt, exponent_dif_int32;
-        `endif
+                cross F128_input_fmt, F128_sign, result_int32_fmt, exponent_dif_int32;
     `endif
 
     `ifdef COVER_F128
         `ifdef COVER_LONG
             B22_F128_LONG:
-                cross F128_input_fmt, operand_sign, result_long64_fmt, exponent_dif_long64;
+                cross F128_input_fmt, F128_sign, result_long64_fmt, exponent_dif_long64;
         `endif
     `endif
 
