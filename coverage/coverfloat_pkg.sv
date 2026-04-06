@@ -517,23 +517,23 @@ package coverfloat_pkg;
 
     case (fmt)
             FMT_HALF: begin
-                logic [F16_E_BITS-1:0] biased_exp = input_val[14:10];
+                logic [F16_E_BITS-1:0] biased_exp = input_val[F16_E_UPPER:F16_E_LOWER];
                 unbiased_exp = int'(biased_exp) - F16_EXP_BIAS;
             end
             FMT_BF16: begin
-                logic [BF16_E_BITS-1:0] biased_exp = input_val[14:7];
+                logic [BF16_E_BITS-1:0] biased_exp = input_val[BF16_E_UPPER:BF16_E_LOWER];
                 unbiased_exp = int'(biased_exp) - BF16_EXP_BIAS;
             end
             FMT_SINGLE: begin
-                logic [F32_E_BITS-1:0] biased_exp = input_val[30:23];
+                logic [F32_E_BITS-1:0] biased_exp = input_val[F32_E_UPPER:F32_E_LOWER];
                 unbiased_exp = int'(biased_exp) - F32_EXP_BIAS;
             end
             FMT_DOUBLE: begin
-                logic [F64_E_BITS-1:0] biased_exp = input_val[62:52];
+                logic [F64_E_BITS-1:0] biased_exp = input_val[F64_E_UPPER:F64_E_LOWER];
                 unbiased_exp = int'(biased_exp) - F64_EXP_BIAS;
             end
             FMT_QUAD: begin
-                logic [F128_E_BITS-1:0] biased_exp = input_val[126:112];
+                logic [F128_E_BITS-1:0] biased_exp = input_val[F128_E_UPPER:F128_E_LOWER];
                 unbiased_exp = int'(biased_exp) - F128_EXP_BIAS;
             end
 
