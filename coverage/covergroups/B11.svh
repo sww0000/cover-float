@@ -21,27 +21,27 @@ covergroup B11_cg (virtual coverfloat_interface CFI);
      *
      ************************************************************************/
 
-    F16_src_fmt: coverpoint (CFI.operandFmt == FMT_HALF) {
+    F16_result_fmt: coverpoint (CFI.resultFmt == FMT_HALF) {
         type_option.weight = 0;
         bins f16 = {1};
     }
 
-    BF16_src_fmt: coverpoint (CFI.operandFmt == FMT_BF16) {
+    BF16_result_fmt: coverpoint (CFI.resultFmt == FMT_BF16) {
         type_option.weight = 0;
         bins bf16 = {1};
     }
 
-    F32_src_fmt: coverpoint (CFI.operandFmt == FMT_SINGLE) {
+    F32_result_fmt: coverpoint (CFI.resultFmt == FMT_SINGLE) {
         type_option.weight = 0;
         bins f32 = {1};
     }
 
-    F64_src_fmt: coverpoint (CFI.operandFmt == FMT_DOUBLE) {
+    F64_result_fmt: coverpoint (CFI.resultFmt == FMT_DOUBLE) {
         type_option.weight = 0;
         bins f64 = {1};
     }
 
-    F128_src_fmt: coverpoint (CFI.operandFmt == FMT_QUAD) {
+    F128_result_fmt: coverpoint (CFI.resultFmt == FMT_QUAD) {
         type_option.weight = 0;
         bins f128 = {1};
     }
