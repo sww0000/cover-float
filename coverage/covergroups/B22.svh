@@ -28,31 +28,31 @@ covergroup B22_cg (virtual coverfloat_interface CFI);
     }
 
     // Sign coverpoints
-    F16_sign: coverpoint CFI.result[15] {
+    F16_sign: coverpoint CFI.result[F16_SIGN_BIT] {
         type_option.weight = 0;
         bins pos = {0};
         bins neg = {1};
     }
 
-    BF16_sign: coverpoint CFI.result[15] {
+    BF16_sign: coverpoint CFI.result[BF16_SIGN_BIT] {
         type_option.weight = 0;
         bins pos = {0};
         bins neg = {1};
     }
 
-    F32_sign: coverpoint CFI.result[31] {
+    F32_sign: coverpoint CFI.result[F32_SIGN_BIT] {
         type_option.weight = 0;
         bins pos = {0};
         bins neg = {1};
     }
 
-    F64_sign: coverpoint CFI.result[63] {
+    F64_sign: coverpoint CFI.result[F64_SIGN_BIT] {
         type_option.weight = 0;
         bins pos = {0};
         bins neg = {1};
     }
 
-    F128_sign: coverpoint CFI.result[127] {
+    F128_sign: coverpoint CFI.result[F128_SIGN_BIT] {
         type_option.weight = 0;
         bins pos = {0};
         bins neg = {1};
