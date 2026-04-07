@@ -71,6 +71,8 @@ package coverfloat_pkg;
 
     // TODO: expand with other relvelant parameters
 
+    parameter int INTERM_M_BITS = 340;
+
     parameter int F16_E_BITS = 5;
     parameter int BF16_E_BITS = 8;
     parameter int F32_E_BITS = 8;
@@ -106,6 +108,12 @@ package coverfloat_pkg;
     parameter int F32_M_UPPER  = F32_M_BITS - 1;
     parameter int F64_M_UPPER  = F64_M_BITS - 1;
     parameter int F128_M_UPPER = F128_M_BITS - 1;
+
+    parameter int F16_MAXNORM_EXP  = (1 << F16_E_BITS)  - 2;
+    parameter int BF16_MAXNORM_EXP = (1 << BF16_E_BITS) - 2;
+    parameter int F32_MAXNORM_EXP  = (1 << F32_E_BITS)  - 2;
+    parameter int F64_MAXNORM_EXP  = (1 << F64_E_BITS)  - 2;
+    parameter int F128_MAXNORM_EXP = (1 << F128_E_BITS) - 2;
 
     // IEEE-754 floating-point format–derived exponent constants
     // Definitions are derived from IEEE 754-2019, §3.4 (Formats) and §3.5 (Subnormal numbers)
@@ -158,9 +166,52 @@ package coverfloat_pkg;
     parameter int F128_MIN_NORM_EXP    = 1 - F128_EXP_BIAS;
     parameter int F128_MIN_SUBNORM_EXP = (1 - F128_EXP_BIAS) - (F128_P - 1);
 
+    parameter int SIZEOF_INT  = 32;
+    parameter int SIZEOF_LONG = 64;
 
 
     // Helper functions for difficult coverpoints
+
+    // determine hamming distance between two signals
+    function automatic int sig_hamming_distance(
+        input logic [255:0] a,
+        input logic [255:0] b,
+        input int width
+    );
+        int i;
+        int distance;
+
+        begin
+            distance = 0;
+
+            for (i = 0; i < width; i++) begin
+                if (a[i] != b[i])
+                    distance++;
+            end
+
+            return distance;
+        end
+    endfunction
+
+    // find index of first bit that differs between two signals
+    function automatic int sig_diff_index(
+        input logic [255:0] a,
+        input logic [255:0] b,
+        input int width
+    );
+        int i;
+
+        begin
+            for (i = 0; i < width; i++) begin
+                if (a[i] != b[i]) begin
+                    return i;
+                end
+            end
+
+            return -1;
+        end
+    endfunction
+
 
     // Count leading zeros (from MSB downward)
     function automatic int count_leading_zeros (
@@ -327,6 +378,7 @@ package coverfloat_pkg;
 
         int E_a;
         int E_b;
+        int bias;
 
         case (fmt)
 
@@ -345,6 +397,8 @@ package coverfloat_pkg;
                 E_b = (exp_b == 0) ?
                         (1 - F16_EXP_BIAS) :
                         (int'(exp_b) - F16_EXP_BIAS);
+
+                bias = F16_EXP_BIAS;
             end
 
             // --------------------------------------------------
@@ -362,6 +416,8 @@ package coverfloat_pkg;
                 E_b = (exp_b == 0) ?
                         (1 - BF16_EXP_BIAS) :
                         (int'(exp_b) - BF16_EXP_BIAS);
+
+                bias = BF16_EXP_BIAS;
             end
 
             // --------------------------------------------------
@@ -379,6 +435,8 @@ package coverfloat_pkg;
                 E_b = (exp_b == 0) ?
                         (1 - F32_EXP_BIAS) :
                         (int'(exp_b) - F32_EXP_BIAS);
+
+                bias = F32_EXP_BIAS;
             end
 
             // --------------------------------------------------
@@ -396,6 +454,8 @@ package coverfloat_pkg;
                 E_b = (exp_b == 0) ?
                         (1 - F64_EXP_BIAS) :
                         (int'(exp_b) - F64_EXP_BIAS);
+
+                bias = F64_EXP_BIAS;
             end
 
             // --------------------------------------------------
@@ -414,6 +474,8 @@ package coverfloat_pkg;
                         (1 - F128_EXP_BIAS) :
                         (int'(exp_b) - F128_EXP_BIAS);
 
+                bias = F128_EXP_BIAS;
+
             end
 
             default: begin
@@ -422,7 +484,7 @@ package coverfloat_pkg;
 
         endcase
 
-        return (E_a + E_b);
+        return (E_a + E_b) + bias;
 
     endfunction
 
