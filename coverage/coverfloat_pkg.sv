@@ -71,7 +71,7 @@ package coverfloat_pkg;
 
     // TODO: expand with other relvelant parameters
 
-    parameter int INTERM_M_BITS = 256;
+    parameter int INTERM_M_BITS = 340;
 
     parameter int F16_E_BITS = 5;
     parameter int BF16_E_BITS = 8;
@@ -102,6 +102,12 @@ package coverfloat_pkg;
     parameter int F64_E_LOWER  = 52;
     parameter int F128_E_UPPER = 126;
     parameter int F128_E_LOWER = 112;
+
+    parameter int F16_SIGN_BIT = 15;
+    parameter int BF16_SIGN_BIT = 15;
+    parameter int F32_SIGN_BIT = 31;
+    parameter int F64_SIGN_BIT = 63;
+    parameter int F128_SIGN_BIT = 127;
 
     parameter int F16_M_UPPER  = F16_M_BITS - 1;
     parameter int BF16_M_UPPER = BF16_M_BITS - 1;
@@ -378,6 +384,7 @@ package coverfloat_pkg;
 
         int E_a;
         int E_b;
+        int bias;
 
         case (fmt)
 
@@ -396,6 +403,8 @@ package coverfloat_pkg;
                 E_b = (exp_b == 0) ?
                         (1 - F16_EXP_BIAS) :
                         (int'(exp_b) - F16_EXP_BIAS);
+
+                bias = F16_EXP_BIAS;
             end
 
             // --------------------------------------------------
@@ -413,6 +422,8 @@ package coverfloat_pkg;
                 E_b = (exp_b == 0) ?
                         (1 - BF16_EXP_BIAS) :
                         (int'(exp_b) - BF16_EXP_BIAS);
+
+                bias = BF16_EXP_BIAS;
             end
 
             // --------------------------------------------------
@@ -430,6 +441,8 @@ package coverfloat_pkg;
                 E_b = (exp_b == 0) ?
                         (1 - F32_EXP_BIAS) :
                         (int'(exp_b) - F32_EXP_BIAS);
+
+                bias = F32_EXP_BIAS;
             end
 
             // --------------------------------------------------
@@ -447,6 +460,8 @@ package coverfloat_pkg;
                 E_b = (exp_b == 0) ?
                         (1 - F64_EXP_BIAS) :
                         (int'(exp_b) - F64_EXP_BIAS);
+
+                bias = F64_EXP_BIAS;
             end
 
             // --------------------------------------------------
@@ -465,6 +480,8 @@ package coverfloat_pkg;
                         (1 - F128_EXP_BIAS) :
                         (int'(exp_b) - F128_EXP_BIAS);
 
+                bias = F128_EXP_BIAS;
+
             end
 
             default: begin
@@ -473,39 +490,8 @@ package coverfloat_pkg;
 
         endcase
 
-        return (E_a + E_b);
+        return (E_a + E_b) + bias;
 
-    endfunction
-
-    function automatic int get_sign(
-        input logic [127:0] input_val,
-        input logic [7:0]   fmt);
-
-        int input_sign;
-
-        case (fmt)
-            FMT_HALF: begin
-                input_sign = input_val[15];
-            end
-            FMT_BF16: begin
-                input_sign = input_val[15];
-            end
-            FMT_SINGLE: begin
-                input_sign = input_val[31];
-            end
-            FMT_DOUBLE: begin
-                input_sign = input_val[63];
-            end
-            FMT_QUAD: begin
-                input_sign = input_val[127];
-            end
-
-            default: begin
-                return 0;
-            end
-        endcase
-
-        return input_sign;
     endfunction
 
     function automatic int get_unbiased_exponent(
@@ -517,23 +503,23 @@ package coverfloat_pkg;
 
     case (fmt)
             FMT_HALF: begin
-                logic [F16_E_BITS-1:0] biased_exp = input_val[14:10];
+                logic [F16_E_BITS-1:0] biased_exp = input_val[F16_E_UPPER:F16_E_LOWER];
                 unbiased_exp = int'(biased_exp) - F16_EXP_BIAS;
             end
             FMT_BF16: begin
-                logic [BF16_E_BITS-1:0] biased_exp = input_val[14:7];
+                logic [BF16_E_BITS-1:0] biased_exp = input_val[BF16_E_UPPER:BF16_E_LOWER];
                 unbiased_exp = int'(biased_exp) - BF16_EXP_BIAS;
             end
             FMT_SINGLE: begin
-                logic [F32_E_BITS-1:0] biased_exp = input_val[30:23];
+                logic [F32_E_BITS-1:0] biased_exp = input_val[F32_E_UPPER:F32_E_LOWER];
                 unbiased_exp = int'(biased_exp) - F32_EXP_BIAS;
             end
             FMT_DOUBLE: begin
-                logic [F64_E_BITS-1:0] biased_exp = input_val[62:52];
+                logic [F64_E_BITS-1:0] biased_exp = input_val[F64_E_UPPER:F64_E_LOWER];
                 unbiased_exp = int'(biased_exp) - F64_EXP_BIAS;
             end
             FMT_QUAD: begin
-                logic [F128_E_BITS-1:0] biased_exp = input_val[126:112];
+                logic [F128_E_BITS-1:0] biased_exp = input_val[F128_E_UPPER:F128_E_LOWER];
                 unbiased_exp = int'(biased_exp) - F128_EXP_BIAS;
             end
 
