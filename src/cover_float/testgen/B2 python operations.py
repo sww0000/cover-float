@@ -3,6 +3,8 @@ Angela Zheng (angela20061015@gmail.com)
 
 Created:         April 6, 2026
 Last Edited:     April 6, 2026
+
+python division
 """
 
 import random
@@ -20,6 +22,9 @@ from cover_float.common.constants import (
     OP_ADD,
     OP_DIV,
     OP_FMADD,
+    OP_FMSUB,
+    OP_FNMADD,
+    OP_FNMSUB,
     OP_MUL,
     OP_SQRT,
     OP_SUB,
@@ -231,6 +236,81 @@ def test_fmadd(fmt: str, desired_result: str, base_e: int, maxnorm: bool, test_f
     )
 
 
+def test_fmsub(fmt: str, desired_result: str, base_e: int, maxnorm: bool, test_f: TextIO, cover_f: TextIO) -> None:
+    bias, m_bits = BIAS[fmt], MANTISSA_BITS[fmt]
+
+    if maxnorm:
+        a_exp = random.randint(bias, BIASED_EXP[fmt][1])
+        b_exp = random.randint(max(0, BIASED_EXP[fmt][1] - a_exp - m_bits), BIASED_EXP[fmt][1] - a_exp)
+    else:
+        a_exp = random.randint(1, bias)
+        b_exp = base_e - a_exp + bias
+
+    a_hex = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(m_bits))
+    b_hex = decimalComponentsToHex(fmt, random.randint(0, 1), b_exp, random.getrandbits(m_bits))
+
+    # Math: C = -Desired + (A * B)
+    d_dec = hexToDecimal(desired_result, fmt)
+    a_dec = hexToDecimal(a_hex, fmt)
+    b_dec = hexToDecimal(b_hex, fmt)
+    c_dec = d_dec * (-1) + (a_dec * b_dec)
+    c_hex = decimalToHex(c_dec, fmt)
+
+    run_and_store_test_vector(
+        f"{OP_FMSUB}_{ROUND_NEAR_EVEN}_{a_hex}_{b_hex}_{c_hex}_{fmt}_{'0' * 32}_{fmt}_00", test_f, cover_f
+    )
+
+
+def test_fnmadd(fmt: str, desired_result: str, base_e: int, maxnorm: bool, test_f: TextIO, cover_f: TextIO) -> None:
+    bias, m_bits = BIAS[fmt], MANTISSA_BITS[fmt]
+
+    if maxnorm:
+        a_exp = random.randint(bias, BIASED_EXP[fmt][1])
+        b_exp = random.randint(max(0, BIASED_EXP[fmt][1] - a_exp - m_bits), BIASED_EXP[fmt][1] - a_exp)
+    else:
+        a_exp = random.randint(1, bias)
+        b_exp = base_e - a_exp + bias
+
+    a_hex = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(m_bits))
+    b_hex = decimalComponentsToHex(fmt, random.randint(0, 1), b_exp, random.getrandbits(m_bits))
+
+    # Math: C = -Desired - (A * B)
+    d_dec = hexToDecimal(desired_result, fmt)
+    a_dec = hexToDecimal(a_hex, fmt)
+    b_dec = hexToDecimal(b_hex, fmt)
+    c_dec = d_dec * (-1) - (a_dec * b_dec)
+    c_hex = decimalToHex(c_dec, fmt)
+
+    run_and_store_test_vector(
+        f"{OP_FNMADD}_{ROUND_NEAR_EVEN}_{a_hex}_{b_hex}_{c_hex}_{fmt}_{'0' * 32}_{fmt}_00", test_f, cover_f
+    )
+
+
+def test_fnmsub(fmt: str, desired_result: str, base_e: int, maxnorm: bool, test_f: TextIO, cover_f: TextIO) -> None:
+    bias, m_bits = BIAS[fmt], MANTISSA_BITS[fmt]
+
+    if maxnorm:
+        a_exp = random.randint(bias, BIASED_EXP[fmt][1])
+        b_exp = random.randint(max(0, BIASED_EXP[fmt][1] - a_exp - m_bits), BIASED_EXP[fmt][1] - a_exp)
+    else:
+        a_exp = random.randint(1, bias)
+        b_exp = base_e - a_exp + bias
+
+    a_hex = decimalComponentsToHex(fmt, random.randint(0, 1), a_exp, random.getrandbits(m_bits))
+    b_hex = decimalComponentsToHex(fmt, random.randint(0, 1), b_exp, random.getrandbits(m_bits))
+
+    # Math: C = Desired + (A * B)
+    d_dec = hexToDecimal(desired_result, fmt)
+    a_dec = hexToDecimal(a_hex, fmt)
+    b_dec = hexToDecimal(b_hex, fmt)
+    c_dec = d_dec + (a_dec * b_dec)
+    c_hex = decimalToHex(c_dec, fmt)
+
+    run_and_store_test_vector(
+        f"{OP_FNMSUB}_{ROUND_NEAR_EVEN}_{a_hex}_{b_hex}_{c_hex}_{fmt}_{'0' * 32}_{fmt}_00", test_f, cover_f
+    )
+
+
 def main() -> None:
     with (
         Path("./tests/testvectors/B2_tv.txt").open("w") as test_f,
@@ -273,14 +353,14 @@ def main() -> None:
                         seed(reproducible_hash(f"{fmt}_b2_fmadd_{base_e}_{i}_{sign}"))
                         test_fmadd(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
 
-                        # seed(reproducible_hash(f"{fmt}_b2_fmsub_{base_e}_{i}_{sign}"))
-                        # test_fmsub(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
+                        seed(reproducible_hash(f"{fmt}_b2_fmsub_{base_e}_{i}_{sign}"))
+                        test_fmsub(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
 
-                        # seed(reproducible_hash(f"{fmt}_b2_fnmadd_{base_e}_{i}_{sign}"))
-                        # test_fnmadd(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
+                        seed(reproducible_hash(f"{fmt}_b2_fnmadd_{base_e}_{i}_{sign}"))
+                        test_fnmadd(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
 
-                        # seed(reproducible_hash(f"{fmt}_b2_fnmsub_{base_e}_{i}_{sign}"))
-                        # test_fnmsub(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
+                        seed(reproducible_hash(f"{fmt}_b2_fnmsub_{base_e}_{i}_{sign}"))
+                        test_fnmsub(fmt, desired_result, base_e, maxnorm, test_f, cover_f)
 
 
 if __name__ == "__main__":
