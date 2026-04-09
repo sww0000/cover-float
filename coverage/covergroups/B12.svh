@@ -57,9 +57,9 @@ covergroup B12_cg (virtual coverfloat_interface CFI);
         (
             $signed(int'(CFI.intermX)) -
             (
-                (int'(CFI.a[14:10]) > int'(CFI.b[14:10]))
-                ? int'(CFI.a[14:10])
-                : int'(CFI.b[14:10])
+                (int'(CFI.a[F16_E_UPPER:F16_E_LOWER]) > int'(CFI.b[F16_E_UPPER:F16_E_LOWER]))
+                ? int'(CFI.a[F16_E_UPPER:F16_E_LOWER])
+                : int'(CFI.b[F16_E_UPPER:F16_E_LOWER])
             )
         )
     {
@@ -71,9 +71,9 @@ covergroup B12_cg (virtual coverfloat_interface CFI);
         (
             $signed(int'(CFI.intermX)) -
             (
-                (int'(CFI.a[14:7]) > int'(CFI.b[14:7]))
-                ? int'(CFI.a[14:7])
-                : int'(CFI.b[14:7])
+                (int'(CFI.a[BF16_E_UPPER:BF16_E_LOWER]) > int'(CFI.b[BF16_E_UPPER:BF16_E_LOWER]))
+                ? int'(CFI.a[BF16_E_UPPER:BF16_E_LOWER])
+                : int'(CFI.b[BF16_E_UPPER:BF16_E_LOWER])
             )
         )
     {
@@ -85,9 +85,9 @@ covergroup B12_cg (virtual coverfloat_interface CFI);
         (
             $signed(int'(CFI.intermX)) -
             (
-                (int'(CFI.a[30:23]) > int'(CFI.b[30:23]))
-                ? int'(CFI.a[30:23])
-                : int'(CFI.b[30:23])
+                (int'(CFI.a[F32_E_UPPER:F32_E_LOWER]) > int'(CFI.b[F32_E_UPPER:F32_E_LOWER]))
+                ? int'(CFI.a[F32_E_UPPER:F32_E_LOWER])
+                : int'(CFI.b[F32_E_UPPER:F32_E_LOWER])
             )
         )
     {
@@ -99,9 +99,9 @@ covergroup B12_cg (virtual coverfloat_interface CFI);
         (
             $signed(int'(CFI.intermX)) -
             (
-                (int'(CFI.a[62:52]) > int'(CFI.b[62:52]))
-                ? int'(CFI.a[62:52])
-                : int'(CFI.b[62:52])
+                (int'(CFI.a[F64_E_UPPER:F64_E_LOWER]) > int'(CFI.b[F64_E_UPPER:F64_E_LOWER]))
+                ? int'(CFI.a[F64_E_UPPER:F64_E_LOWER])
+                : int'(CFI.b[F64_E_UPPER:F64_E_LOWER])
             )
         )
     {
@@ -113,9 +113,9 @@ covergroup B12_cg (virtual coverfloat_interface CFI);
         (
             $signed(int'(CFI.intermX)) -
             (
-                (int'(CFI.a[126:112]) > int'(CFI.b[126:112]))
-                ? int'(CFI.a[126:112])
-                : int'(CFI.b[126:112])
+                (int'(CFI.a[F128_E_UPPER:F128_E_LOWER]) > int'(CFI.b[F128_E_UPPER:F128_E_LOWER]))
+                ? int'(CFI.a[F128_E_UPPER:F128_E_LOWER])
+                : int'(CFI.b[F128_E_UPPER:F128_E_LOWER])
             )
         )
     {
@@ -130,28 +130,23 @@ covergroup B12_cg (virtual coverfloat_interface CFI);
      ************************************************************************/
 
     `ifdef COVER_F16
-        B12_F16_addsub_cancel:
-            cross FP_addsub_ops, F16_cancellation, F16_result_fmt;
+        B12_F16_addsub_cancel:  cross FP_addsub_ops, F16_cancellation,  F16_result_fmt;
     `endif
 
     `ifdef COVER_BF16
-        B12_BF16_addsub_cancel:
-            cross FP_addsub_ops, BF16_cancellation, BF16_result_fmt;
+        B12_BF16_addsub_cancel: cross FP_addsub_ops, BF16_cancellation, BF16_result_fmt;
     `endif
 
     `ifdef COVER_F32
-        B12_F32_addsub_cancel:
-            cross FP_addsub_ops, F32_cancellation, F32_result_fmt;
+        B12_F32_addsub_cancel:  cross FP_addsub_ops, F32_cancellation,  F32_result_fmt;
     `endif
 
     `ifdef COVER_F64
-        B12_F64_addsub_cancel:
-            cross FP_addsub_ops, F64_cancellation, F64_result_fmt;
+        B12_F64_addsub_cancel:  cross FP_addsub_ops, F64_cancellation,  F64_result_fmt;
     `endif
 
     `ifdef COVER_F128
-        B12_F128_addsub_cancel:
-            cross FP_addsub_ops, F128_cancellation, F128_result_fmt;
+        B12_F128_addsub_cancel: cross FP_addsub_ops, F128_cancellation, F128_result_fmt;
     `endif
 
 endgroup
