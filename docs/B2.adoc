@@ -11,8 +11,7 @@ Aharoni et al.
 
 SUMMARY
 This script generates test vectors for the B2 model: Near FP Base Values - Hamming Distance.
-It takes specific boundary values (Zero, One, MinSubNorm, etc.) and enumerates over
-small deviations by flipping one bit of the significand at a time.
+It takes specific boundary values (Zero, One, MinSubNorm, etc.) and enumerates over small deviations by flipping one bit of the significand at a time, testing all arithmetic operations.
 
 DEFINITION
 Base Values: Zero, One, MinSubNorm, MaxSubNorm, MinNorm, MaxNorm
@@ -27,7 +26,6 @@ Maxsubnorm  0.7FFFFF P-126
 MinNorm     1.000000 P-126
 MaxNorm     1.7FFFFF P127
 
-We're only testing arithmetic operations
 === Design choices & Impossible cases
 1. By significand, we took it as mantissa
 2. We don't test negative values of sqrt because they are tested in other models
