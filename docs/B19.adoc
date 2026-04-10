@@ -494,7 +494,7 @@ The cells (>, <), (>, =), (<, >), (<, =) are impossible except the five rows sho
 
 ---
 
-=== Case 7: ±Normal × ±Zero
+=== Case 6: ±Normal × ±Zero
 
 [cols="1,1,1,1,1,1",options="header"]
 |===
@@ -575,6 +575,160 @@ The cells (>, <), (>, =), (<, >), (<, =) are impossible except the five rows sho
 * *exp > sig > achievable:* F_input_1 = any_frac > 0 = F_input_2. Correct.
 
 * *exp > sig = achievable:* Both fracs must be equal. Since frac2 = 0 (zero's frac is fixed), frac1 must also be 0. So F_input_1 = all zeros, not any_frac. Both are 0, giving sig =.
+
+---
+
+=== Case 7: ±Zero × ±Subnormal
+
+[cols="1,1,1,1,1,1",options="header"]
+|===
+| Exp | Frac | Exp_input_1 | Exp_input_2 | F_input_1 | F_input_2
+
+| >
+| >
+| impossible
+|
+|
+|
+
+| >
+| <
+| 0s
+| 0s
+| all zeros
+| any frac
+
+| >
+| =
+| impossible
+|
+|
+|
+
+| <
+| >
+| impossible
+|
+|
+|
+
+| <
+| <
+| impossible
+|
+|
+|
+
+| <
+| =
+| impossible
+|
+|
+|
+
+| =
+| >
+| impossible
+|
+|
+|
+
+| =
+| <
+| impossible
+|
+|
+|
+
+| =
+| =
+| impossible
+|
+|
+|===
+
+*Total per precision:* 1 cell × 4 sign combos = **4**
+
+==== Impossibility reasoning
+
+Subnormal numbers have effective exponents that are strictly negative, while zero has a biased exponent of 0. Consequently, exp_zero > exp_subnormal is the only achievable relationship. Given this constraint, the zero's mantissa is fixed at all zeros, which necessitates the subnormal's mantissa to be non-zero for any comparison. Thus, the sole valid scenario is: exp_zero > exp_subnormal with frac_zero < frac_subnormal.
+
+---
+
+=== Case 8: ±Subnormal × ±Zero
+
+[cols="1,1,1,1,1,1",options="header"]
+|===
+| Exp | Frac | Exp_input_1 | Exp_input_2 | F_input_1 | F_input_2
+
+| >
+| >
+| impossible
+|
+|
+|
+
+| >
+| <
+| impossible
+|
+|
+|
+
+| >
+| =
+| impossible
+|
+|
+|
+
+| <
+| >
+| 0s
+| 0s
+| any frac
+| all zeros
+
+| <
+| <
+| impossible
+|
+|
+|
+
+| <
+| =
+| impossible
+|
+|
+|
+
+| =
+| >
+| impossible
+|
+|
+|
+
+| =
+| <
+| impossible
+|
+|
+|
+
+| =
+| =
+| impossible
+|
+|
+|===
+
+*Total per precision:* 1 cell × 4 sign combos = **4**
+
+==== Impossibility reasoning
+
+By symmetry with Case 7, with the same constraints on exponents and mantissas, only the achievable cell differs due to the swapped operand positions.
 
 ---
 
@@ -694,11 +848,23 @@ The 4 vectors come from the 4 sign combinations: (+0,+0), (+0,−0), (−0,+0), 
 | × 4
 | 8
 
-| 7
+| 6
 | Normal × Zero
 | 2
 | × 4
 | 8
+
+| 7
+| Zero × Subnormal
+| 1
+| × 4
+| 4
+
+| 8
+| Subnormal × Zero
+| 1
+| × 4
+| 4
 
 | 9
 | Zero × Zero
@@ -710,7 +876,7 @@ The 4 vectors come from the 4 sign combinations: (+0,+0), (+0,−0), (−0,+0), 
 |
 |
 | *Total per (fmt, op):*
-| *100*
+| *108*
 |===
 
 === Grand Total Breakdown
@@ -720,22 +886,22 @@ The 4 vectors come from the 4 sign combinations: (+0,+0), (+0,−0), (−0,+0), 
 | Format | Total vectors
 
 | BF_16
-| 100 per op × 5 ops = 500
+| 108 per op × 5 ops = 540
 
 | FP_16
-| 100 per op × 5 ops = 500
+| 108 per op × 5 ops = 540
 
 | FP_32
-| 100 per op × 5 ops = 500
+| 108 per op × 5 ops = 540
 
 | FP_64
-| 100 per op × 5 ops = 500
+| 108 per op × 5 ops = 540
 
 | FP_128
-| 100 per op × 5 ops = 500
+| 108 per op × 5 ops = 540
 
 |
-| *Grand Total: 2500*
+| *Grand Total: 2700*
 |===
 
 *Note:* Differs from Aharoni test count. Aharoni reports ~9 E 2 total; our count is higher because we enumerate all 4 sign combinations explicitly and implement 5 operations separately.

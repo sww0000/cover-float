@@ -5,7 +5,7 @@
 # comparison and min/max operations. Test cases are generated for each
 # combination of exponent and significand relationship constraints.
 #
-# Total vectors: 2500 (100 per format x op, across 5 formats and 5 operations)
+# Total vectors: 2700 (108 per format x op, across 5 formats and 5 operations)
 
 import random
 from pathlib import Path
@@ -197,8 +197,8 @@ def _case_5_zero_x_normal(fmt: str, op: str, test_f: TextIO, cover_f: TextIO) ->
     return count
 
 
-def _case_7_normal_x_zero(fmt: str, op: str, test_f: TextIO, cover_f: TextIO) -> int:
-    """Case 7: +/-Normal x +/-Zero.  2 cells x 4 sign combos = 8."""
+def _case_6_normal_x_zero(fmt: str, op: str, test_f: TextIO, cover_f: TextIO) -> int:
+    """Case 6: +/-Normal x +/-Zero.  2 cells x 4 sign combos = 8."""
     af = _any_frac(fmt)
     bexp1 = _any_exp(fmt)
     count = 0
@@ -210,6 +210,38 @@ def _case_7_normal_x_zero(fmt: str, op: str, test_f: TextIO, cover_f: TextIO) ->
         for s1 in (0, 1):
             for s2 in (0, 1):
                 _emit(fmt, op, test_f, cover_f, s1, bexp1, frac1, s2, 0, 0)
+                count += 1
+
+    return count
+
+
+def _case_7_zero_x_subnormal(fmt: str, op: str, test_f: TextIO, cover_f: TextIO) -> int:
+    """Case 7: +/-Zero x +/-Subnormal.  1 cell x 4 sign combos = 4."""
+    af = _any_frac(fmt)
+    count = 0
+
+    for frac2 in [
+        af,  # sig <  (zero frac=0 < any_frac)
+    ]:
+        for s1 in (0, 1):
+            for s2 in (0, 1):
+                _emit(fmt, op, test_f, cover_f, s1, 0, 0, s2, 0, frac2)
+                count += 1
+
+    return count
+
+
+def _case_8_subnormal_x_zero(fmt: str, op: str, test_f: TextIO, cover_f: TextIO) -> int:
+    """Case 8: +/-Subnormal x +/-Zero.  1 cell x 4 sign combos = 4."""
+    af = _any_frac(fmt)
+    count = 0
+
+    for frac1 in [
+        af,  # sig >  (any_frac > zero frac=0)
+    ]:
+        for s1 in (0, 1):
+            for s2 in (0, 1):
+                _emit(fmt, op, test_f, cover_f, s1, 0, frac1, s2, 0, 0)
                 count += 1
 
     return count
@@ -239,10 +271,12 @@ def generate_b19_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
         c3 = _case_3_subnormal_x_normal(fmt, op, test_f, cover_f)
         c4 = _case_4_subnormal_x_subnormal(fmt, op, test_f, cover_f)
         c5 = _case_5_zero_x_normal(fmt, op, test_f, cover_f)
-        c7 = _case_7_normal_x_zero(fmt, op, test_f, cover_f)
+        c6 = _case_6_normal_x_zero(fmt, op, test_f, cover_f)
+        c7 = _case_7_zero_x_subnormal(fmt, op, test_f, cover_f)
+        c8 = _case_8_subnormal_x_zero(fmt, op, test_f, cover_f)
         c9 = _case_9_zero_x_zero(fmt, op, test_f, cover_f)
-        total = c1 + c2 + c3 + c4 + c5 + c7 + c9
-        print(f"  {op}: c1={c1} c2={c2} c3={c3} c4={c4} c5={c5} c7={c7} c9={c9} total={total}")
+        total = c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9
+        print(f"  {op}: c1={c1} c2={c2} c3={c3} c4={c4} c5={c5} c6={c6} c7={c7} c8={c8} c9={c9} total={total}")
 
 
 def main() -> None:
