@@ -2,7 +2,7 @@
 Angela Zheng (angela20061015@gmail.com)
 
 Created:         April 8, 2026
-Last Edited:     April 8, 2026
+Last Edited:     April 10, 2026
 """
 
 import random
@@ -38,7 +38,7 @@ ZERO = "0" * 32
 
 
 class Generator:
-    MAX_TRIES = 10
+    MAX_TRIES = 20
 
     def __init__(self, fmt: str) -> None:
         self.fmt = fmt
@@ -54,11 +54,11 @@ class Generator:
             random.getrandbits(self.m_bits),
         )
 
-    def random_fp_with_sign(self, exp_range: tuple[int, int], sign: int) -> str:
+    def random_fp_with_sign_and_exp(self, exp: int, sign: int) -> str:
         return decimal_components_to_hex(
             self.fmt,
             sign,
-            random.randint(*exp_range),
+            exp,
             random.getrandbits(self.m_bits),
         )
 
@@ -74,8 +74,8 @@ class Generator:
 
         for _ in range(self.MAX_TRIES):
             a, b, c = builder()
-            res = get_result_from_ref(op, a, b, c, self.fmt)
-            if res == desired.lower():
+            result = get_result_from_ref(op, a, b, c, self.fmt)
+            if result == desired.lower():
                 return a, b, c
             last = (a, b, c)
 
@@ -92,12 +92,7 @@ class Generator:
 
             a_sign = sign if maxnorm else random.randint(0, 1)
 
-            a = decimal_components_to_hex(
-                self.fmt,
-                a_sign,
-                base_e,
-                random.getrandbits(self.m_bits),
-            )
+            a = self.random_fp_with_sign_and_exp(base_e, a_sign)
             b = get_result_from_ref(OP_SUB, desired, a, ZERO, self.fmt)
             return a, b, ZERO
 
@@ -113,12 +108,7 @@ class Generator:
 
             a_sign = sign if maxnorm else random.randint(0, 1)
 
-            a = decimal_components_to_hex(
-                self.fmt,
-                a_sign,
-                base_e,
-                random.getrandbits(self.m_bits),
-            )
+            a = self.random_fp_with_sign_and_exp(base_e, a_sign)
             b = get_result_from_ref(OP_SUB, a, desired, ZERO, self.fmt)
             return a, b, ZERO
 
@@ -128,17 +118,17 @@ class Generator:
         exp_range = (self.bias, self.max_exp) if maxnorm else (1, self.bias)
 
         def builder() -> tuple[str, str, str]:
-            a = self.random_fp_with_sign(exp_range, sign) if maxnorm else self.random_fp(exp_range)
+            a = self.random_fp(exp_range)
             b = get_result_from_ref(OP_DIV, desired, a, ZERO, self.fmt)
             return a, b, ZERO
 
         return self.solve_exact(OP_MUL, desired, builder)
 
     def gen_div(self, desired: str, maxnorm: bool, sign: int) -> tuple[str, str, str]:
-        exp_range = (self.bias, self.max_exp) if maxnorm else (1, self.bias - self.m_bits)
+        exp_range = (self.bias, self.max_exp) if maxnorm else (1, self.bias)
 
         def builder() -> tuple[str, str, str]:
-            a = self.random_fp_with_sign(exp_range, sign) if maxnorm else self.random_fp(exp_range)
+            a = self.random_fp(exp_range)
             b = get_result_from_ref(OP_DIV, a, desired, ZERO, self.fmt)
             return a, b, ZERO
 
@@ -154,15 +144,8 @@ class Generator:
     def gen_fma(self, op: str, desired: str, base_e: int, maxnorm: bool) -> tuple[str, str, str]:
 
         def builder() -> tuple[str, str, str]:
-            if maxnorm:
-                a_exp = random.randint(self.bias, self.max_exp)
-                b_exp = random.randint(
-                    max(0, self.max_exp - a_exp - self.m_bits),
-                    self.max_exp - a_exp,
-                )
-            else:
-                a_exp = random.randint(1, self.bias)
-                b_exp = base_e - a_exp + self.bias
+            a_exp = random.randint(self.bias, self.max_exp) if maxnorm else random.randint(1, self.bias)
+            b_exp = base_e - a_exp + self.bias
 
             a = decimal_components_to_hex(self.fmt, random.randint(0, 1), a_exp, random.getrandbits(self.m_bits))
             b = decimal_components_to_hex(self.fmt, random.randint(0, 1), b_exp, random.getrandbits(self.m_bits))
