@@ -32,7 +32,7 @@ MaxNorm     1.7FFFFF P127
 `a_exp, b_exp, c_exp`:: Exponent of a, b, and c
 `a_m, b_m, c_m`:: Mantissa of a, b, and c
 `result`:: Result of the operation, obtained using SoftFloat
-`desired`:: Desired result, which is a floating point value that is one hamming distance away from a base. Our goal is to make `res == desired`
+`desired`:: Desired result, which is a floating point value that is one hamming distance away from a base. Our goal is to make `result == desired`
 
 == Background
 
@@ -52,7 +52,7 @@ Specific operation-based constraints and deviations are discussed below in <<Spe
 
 == Specific Test Procedure
 
-=== Add & Subract
+=== Add & Subtract
 1. We assign `a_exp` to be the same as the `result` exponent (see 4 in <<Design Choices & Impossible Cases>>)
 2. We check whether the base is maxNorm. If it is, then the sign of `a` has to match the sign of `desired`, because `b_exp` will need to exceed the maximum allowed exponent to bring `result` to the same magnitude as `desired` if `a` and `desired` have opposite signs.
 3. `desired` becomes negative zero when the LSB of MinSubNorm is toggled, and this requires specific operands for add and sub operations (see 3 in <<Design Choices & Impossible Cases>>). Thus, we generate an additional test vector whenever `desired` is `-0` with those specific operands.
@@ -146,6 +146,3 @@ Given that there're 12 bases (6 positive and 6 negative) and each base has `m`, 
 
 | Total tests
 | 19798
-
-== Overall Test Count
-19798
