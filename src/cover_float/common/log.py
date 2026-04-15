@@ -72,7 +72,7 @@ def progress_bar(maybe_iterable: Iterable[T] | None = None, *args: Any, **kwargs
     }
 
     try:
-        tqdm_arguments["ncols"] = (os.get_terminal_size().columns - len(_the_logging_context.prefix),)
+        tqdm_arguments["ncols"] = os.get_terminal_size().columns - len(_the_logging_context.prefix)
     except OSError:
         # ncols is not available in CI or certain environments
         tqdm_arguments["ncols"] = None
