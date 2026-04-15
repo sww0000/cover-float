@@ -13,9 +13,11 @@ from pathlib import Path
 from typing import TextIO
 
 import cover_float.common.constants as constants
+from cover_float.common.log import log_info
 from cover_float.common.util import generate_float, generate_test_vector, reproducible_hash
 from cover_float.reference import run_and_store_test_vector
 from cover_float.testgen.B9 import B9SignificandGenerator
+from cover_float.testgen.model import register_model
 
 B11_OPS = [constants.OP_ADD, constants.OP_SUB]
 
@@ -93,34 +95,27 @@ def uninteresting_tests(
             run_and_store_test_vector(tv, test_f, cover_f)
 
 
-def main() -> None:
-    with (
-        Path("tests/testvectors/B11_tv.txt").open("w") as test_f,
-        Path("tests/covervectors/B11_cv.txt").open("w") as cover_f,
-    ):
-        for fmt in constants.FLOAT_FMTS:
-            seed = reproducible_hash(fmt + "b11")
-            random.seed(seed)
+@register_model("B11")
+def main(test_f: TextIO, cover_f: TextIO) -> None:
+    for fmt in constants.FLOAT_FMTS:
+        seed = reproducible_hash(fmt + "b11")
+        random.seed(seed)
 
-            print(f"Generating {fmt} Sigs & Shifts")
-            bins_path = Path(
-                "coverage",
-                "covergroups",
-                "bins_templates",
-                "generated",
-                f"B11_{constants.FMT_TO_STRING[fmt]}_special_sigs.svh",
-            )
-            bins_path.parent.mkdir(parents=True, exist_ok=True)
+        log_info(f"Generating {fmt} Sigs & Shifts")
+        bins_path = Path(
+            "coverage",
+            "covergroups",
+            "bins_templates",
+            "generated",
+            f"B11_{constants.FMT_TO_STRING[fmt]}_special_sigs.svh",
+        )
+        bins_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with bins_path.open("w") as generated_coverage:
-                sig_gen = B9SignificandGenerator(constants.MANTISSA_BITS[fmt], "b11" + fmt)
-                sigs = [int(sig, 2) for sig in sig_gen.generate(generated_coverage)]
-                interesting_shifts = interesting_shift_ranges(2, 2, fmt)
+        with bins_path.open("w") as generated_coverage:
+            sig_gen = B9SignificandGenerator(constants.MANTISSA_BITS[fmt], "b11" + fmt)
+            sigs = [int(sig, 2) for sig in sig_gen.generate(generated_coverage)]
+            interesting_shifts = interesting_shift_ranges(2, 2, fmt)
 
-                print(f"Generating {fmt} Tests")
-                interesting_tests(sigs, interesting_shifts, fmt, test_f, cover_f)
-                uninteresting_tests(sigs, interesting_shifts, fmt, test_f, cover_f)
-
-
-if __name__ == "__main__":
-    main()
+            log_info(f"Generating {fmt} Tests")
+            interesting_tests(sigs, interesting_shifts, fmt, test_f, cover_f)
+            uninteresting_tests(sigs, interesting_shifts, fmt, test_f, cover_f)

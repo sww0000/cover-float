@@ -13,13 +13,14 @@
 
 
 import random
-from pathlib import Path
 from random import seed
 from typing import TextIO
 
 import cover_float.common.constants as const
+from cover_float.common.log import progress_bar
 from cover_float.common.util import reproducible_hash
 from cover_float.reference import run_and_store_test_vector
+from cover_float.testgen.model import register_model
 
 OPS = [const.OP_FMADD, const.OP_FMSUB, const.OP_FNMADD, const.OP_FNMSUB]
 
@@ -56,7 +57,7 @@ def generate_b14_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     start_shift = -limit
     end_shift = limit
 
-    for target_shift in range(start_shift, end_shift + 1):
+    for target_shift in progress_bar(range(start_shift, end_shift + 1), desc=f"{fmt} Shifts"):
         for op in OPS:
             hashval = reproducible_hash(op + fmt + "b14")  # Unique hash for (op, fmt) seed
             seed(hashval)  # Seed the random generator for reproducibility
@@ -106,14 +107,7 @@ def generate_b14_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 )
 
 
-def main() -> None:
-    with (
-        Path("./tests/testvectors/B14_tv.txt").open("w") as test_f,
-        Path("./tests/covervectors/B14_cv.txt").open("w") as cover_f,
-    ):
-        for fmt in const.FLOAT_FMTS:
-            generate_b14_tests(test_f, cover_f, fmt)
-
-
-if __name__ == "__main__":
-    main()
+@register_model("B14")
+def main(test_f: TextIO, cover_f: TextIO) -> None:
+    for fmt in const.FLOAT_FMTS:
+        generate_b14_tests(test_f, cover_f, fmt)

@@ -1,8 +1,9 @@
-from pathlib import Path
 from typing import TextIO
 
 import cover_float.common.constants as const
+from cover_float.common.log import log_info
 from cover_float.reference import run_and_store_test_vector
+from cover_float.testgen.model import register_model
 
 SRC1_OPS = [const.OP_SQRT, const.OP_CLASS]
 
@@ -277,7 +278,7 @@ def write1SrcTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     print("// 1 source operations, all basic type input combinations", file=test_f)
     # print("//", file=f)
     for op in SRC1_OPS:
-        print(f"OP IS: {op}")
+        log_info(f"OP IS: {op}")
         # print(f"FMT IS: {fmt}")
         for val in BASIC_TYPES[fmt]:
             run_and_store_test_vector(
@@ -293,7 +294,7 @@ def writeCvtTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     print("// 1 source convert operations, all basic type input and result format combinations", file=test_f)
     # print("//", file=f)
     for op in CVT_OPS:
-        print(f"OP IS: {op}")
+        log_info(f"OP IS: {op}")
         # print(f"FMT IS: {fmt}")
         fmts = const.FLOAT_FMTS if op == const.OP_CFF else const.INT_FMTS
         for resultFmt in fmts:
@@ -310,7 +311,7 @@ def write2SrcTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     print("// 2 source operations, all basic type input combinations", file=test_f)
     for op in SRC2_OPS:
-        print(f"OP IS: {op}")
+        log_info(f"OP IS: {op}")
         for val1 in BASIC_TYPES[fmt]:
             for val2 in BASIC_TYPES[fmt]:
                 run_and_store_test_vector(
@@ -324,7 +325,7 @@ def write3SrcTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     print("// 3 source operations, all basic type input combinations", file=test_f)
     for op in SRC3_OPS:
-        print(f"OP IS: {op}")
+        log_info(f"OP IS: {op}")
         for val1 in BASIC_TYPES[fmt]:
             for val2 in BASIC_TYPES[fmt]:
                 for val3 in BASIC_TYPES[fmt]:
@@ -333,21 +334,15 @@ def write3SrcTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                     )
 
 
-def main() -> None:
-    with (
-        Path("./tests/testvectors/B1_tv.txt").open("w") as test_vectors,
-        Path("./tests/covervectors/B1_cv.txt").open("w") as cover_vectors,
-    ):
-        for fmt in const.FLOAT_FMTS:
-            write1SrcTests(test_vectors, cover_vectors, fmt)
-            write2SrcTests(test_vectors, cover_vectors, fmt)
-            write3SrcTests(test_vectors, cover_vectors, fmt)
-            writeCvtTests(test_vectors, cover_vectors, fmt)
-            # writeResultTests(f, fmt)
+@register_model("B1")
+def main(test_vectors: TextIO, cover_vectors: TextIO) -> None:
+    for fmt in const.FLOAT_FMTS:
+        write1SrcTests(test_vectors, cover_vectors, fmt)
+        write2SrcTests(test_vectors, cover_vectors, fmt)
+        write3SrcTests(test_vectors, cover_vectors, fmt)
+        writeCvtTests(test_vectors, cover_vectors, fmt)
+        # writeResultTests(f, fmt)
 
-
-if __name__ == "__main__":
-    main()
 
 """
 

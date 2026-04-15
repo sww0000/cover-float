@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, TextIO
 
 import cover_float.common.constants as constants
+from cover_float.common.log import log_error, log_info
 from cover_float.common.util import (
     bezout_inverse,
     factors_to_bit_width,
@@ -16,6 +17,7 @@ from cover_float.common.util import (
 )
 from cover_float.reference import run_and_store_test_vector
 from cover_float.testgen.B9 import B9SignificandGenerator
+from cover_float.testgen.model import register_model
 
 if TYPE_CHECKING:
     # This block is seen by Pyright but ignored at runtime
@@ -39,9 +41,10 @@ class B15Significand:
 
 
 class B15SignificandGenerator:
-    def __init__(self, nf: int, seed: str) -> None:
+    def __init__(self, nf: int, fmt: str, seed: str) -> None:
         self.sigs: list[B15Significand] = []
         self.nf = nf
+        self.fmt = fmt
         self.seed = seed
 
     def checkerboards(self, patterns: Optional[list[tuple[int, int]]] = None) -> None:
@@ -380,7 +383,7 @@ class B15SignificandGenerator:
 
         hits = 0
         for attempt in range(10000):
-            print(f"hits: {hits}/10, attempts: {attempt}", end="\r")
+            log_info(f"Generating {self.fmt} Sparse Zeros: Generated: {hits}/10, Attempts: {attempt}")
             target = (1 << (2 * self.nf + 2)) - 1
             for _ in range(min(8, self.nf // 2)):
                 p2 = random.randint(1, 2 * self.nf)
@@ -397,7 +400,6 @@ class B15SignificandGenerator:
                 hits += 1
                 if hits == 10:
                     break
-        print("\x1b[2K", end="\r")
 
     @staticmethod
     def evenly_spaced_numbers(start: int, end: int, count: int) -> list[int]:
@@ -443,8 +445,10 @@ class B15SignificandGenerator:
 
             sig1_pattern = "10" * (teeth_length) + "1" * internal_ones_count + "01" * teeth_length
             if len(sig1_pattern) > self.nf + 1:
-                print(f"""Invalid Arrangement for Long Run of Ones, offset={offset}, run_length={run_length} \
-                      \n\t Generated Sig1: {sig1_pattern}, length={len(sig1_pattern)}""")
+                log_error(
+                    f"Invalid Arrangement for Long Run of Ones, offset={offset}, run_length={run_length} "
+                    f"Generated Sig1: {sig1_pattern}, length={len(sig1_pattern)}"
+                )
                 continue
 
             sig1_pattern += "0" * (self.nf + 1 - len(sig1_pattern))
@@ -509,7 +513,7 @@ class B15SignificandGenerator:
                         self.sigs.append(B15Significand(sig1, sig2, target))
                         break
                 else:
-                    print("Long Run Zeros Failed (factoring)")
+                    log_error("Long Run Zeros Failed (factoring)")
             elif run_length + offset - self.nf < 20:
                 # We can generally get away with the stochastic search here (limitation still exists for nf=112)
                 best = 2 * self.nf, 0, 0
@@ -547,7 +551,7 @@ class B15SignificandGenerator:
                         best = score, sig1, sig2
 
                 if best[0] != 0:
-                    print("Long Run Zeros Failed :(")
+                    log_error(f"Long Run Zeros Failed for {self.fmt}")
 
                 sig1 = bin(best[1])[3:]
                 sig2 = bin(best[2])[3:]
@@ -555,23 +559,23 @@ class B15SignificandGenerator:
                 self.sigs.append(B15Significand(sig1, sig2, res))
 
     def generate(self, file: TextIO) -> list[tuple[str, str]]:
-        print("\tChecker Boards")
+        log_info(f"Generating {self.fmt} Checker Boards")
         self.checkerboards()
-        print("\tTrailing Zeros")
+        log_info(f"Generating {self.fmt} Trailing Zeros")
         self.trailing_zeros()
-        print("\tTrailing Ones")
+        log_info(f"Generating {self.fmt} Trailing Ones")
         self.trailing_ones()
-        print("\tLeading Zeros")
+        log_info(f"Generating {self.fmt} Leading Zeros")
         self.leading_zeros()
-        print("\tLeading Ones")
+        log_info(f"Generating {self.fmt} Leading Ones")
         self.leading_ones()
-        print("\tSparse Ones")
+        log_info(f"Generating {self.fmt} Sparse Ones")
         self.sparse_ones()
-        print("\tSparse Zeros")
+        log_info(f"Generating {self.fmt} Sparse Zeros")
         self.sparse_zeros()
-        print("\tLong Runs of Ones")
+        log_info(f"Generating {self.fmt} Long Runs of Ones")
         self.long_run_ones()
-        print("\tLong Runs of Zeros")
+        log_info(f"Generating {self.fmt} Long Runs of Zeros")
         self.long_run_zeros()
 
         self.store_sigs(file)
@@ -703,34 +707,27 @@ def interesting_shift_ranges(low_shifts: int, shifts_from_edge: int, fmt: str) -
     return shifts
 
 
-def main() -> None:
-    with (
-        Path("tests/testvectors/B15_tv.txt").open("w") as test_f,
-        Path("tests/covervectors/B15_cv.txt").open("w") as cover_f,
-    ):
-        for fmt in constants.FLOAT_FMTS:
-            hashval = reproducible_hash(fmt + "b15")
-            random.seed(hashval)
+@register_model("B15")
+def main(test_f: TextIO, cover_f: TextIO) -> None:
+    for fmt in constants.FLOAT_FMTS:
+        hashval = reproducible_hash(fmt + "b15")
+        random.seed(hashval)
 
-            bins_path = Path("coverage", "covergroups", "bins_templates", "generated")
-            bins_path.mkdir(parents=True, exist_ok=True)
+        bins_path = Path("coverage", "covergroups", "bins_templates", "generated")
+        bins_path.mkdir(parents=True, exist_ok=True)
 
-            add_sigs_path = bins_path / f"B15_{constants.FMT_TO_STRING[fmt]}_special_sigs.svh"
-            mul_sigs_path = bins_path / f"B15_{constants.FMT_TO_STRING[fmt]}_prod_special_sigs.svh"
-            with add_sigs_path.open("w") as add_sigs_file, mul_sigs_path.open("w") as mul_sigs_file:
-                print(f"Generating {fmt} Sigs & Shifts")
-                b9_sig_gen = B9SignificandGenerator(constants.MANTISSA_BITS[fmt], fmt + "b15")
-                b9_sigs = [int(sig, 2) for sig in b9_sig_gen.generate(add_sigs_file)]
+        add_sigs_path = bins_path / f"B15_{constants.FMT_TO_STRING[fmt]}_special_sigs.svh"
+        mul_sigs_path = bins_path / f"B15_{constants.FMT_TO_STRING[fmt]}_prod_special_sigs.svh"
+        with add_sigs_path.open("w") as add_sigs_file, mul_sigs_path.open("w") as mul_sigs_file:
+            log_info(f"Generating {fmt} Sigs & Shifts")
+            b9_sig_gen = B9SignificandGenerator(constants.MANTISSA_BITS[fmt], fmt + "b15")
+            b9_sigs = [int(sig, 2) for sig in b9_sig_gen.generate(add_sigs_file)]
 
-                b15_sig_gen = B15SignificandGenerator(constants.MANTISSA_BITS[fmt], fmt + "b15")
-                b15_sigs = [(int(sig1, 2), int(sig2, 2)) for sig1, sig2 in b15_sig_gen.generate(mul_sigs_file)]
+            b15_sig_gen = B15SignificandGenerator(constants.MANTISSA_BITS[fmt], fmt, fmt + "b15")
+            b15_sigs = [(int(sig1, 2), int(sig2, 2)) for sig1, sig2 in b15_sig_gen.generate(mul_sigs_file)]
 
-                interesting_shifts = interesting_shift_ranges(2, 2, fmt)
+            interesting_shifts = interesting_shift_ranges(2, 2, fmt)
 
-                print(f"Generating {fmt} Tests")
-                interesting_tests(b15_sigs, b9_sigs, interesting_shifts, fmt, test_f, cover_f)
-                uninteresting_tests(b15_sigs, b9_sigs, interesting_shifts, fmt, test_f, cover_f)
-
-
-if __name__ == "__main__":
-    main()
+            log_info(f"Generating {fmt} Tests")
+            interesting_tests(b15_sigs, b9_sigs, interesting_shifts, fmt, test_f, cover_f)
+            uninteresting_tests(b15_sigs, b9_sigs, interesting_shifts, fmt, test_f, cover_f)
