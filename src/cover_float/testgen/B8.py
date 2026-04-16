@@ -1,11 +1,12 @@
 # B8 (rwolk@hmc.edu)
 
 import itertools
+import logging
 import random
-from typing import Optional, TextIO
+from typing import Optional, TextIO, cast
 
 import cover_float.common.constants as constants
-from cover_float.common.log import log_error
+import cover_float.common.log as log
 from cover_float.common.util import (
     bezout_inverse,
     extract_rounding_info,
@@ -16,6 +17,8 @@ from cover_float.common.util import (
 )
 from cover_float.reference import run_and_store_test_vector, run_test_vector, store_cover_vector
 from cover_float.testgen.model import register_model
+
+logger: log.ModelLogger = cast(log.ModelLogger, logging.getLogger("B8"))
 
 
 def mul_sigs_with_trailing(target: int, bit_length: int, fmt: str) -> tuple[int, int]:
@@ -138,7 +141,7 @@ def generate_div_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO, targe
         for sign, lsb, guard in sign_lsb_guard():
             maybe_result = divideSetRounding(lsb, guard, target, target_bits, fmt)
             if not maybe_result:
-                log_error(f"Div Failure for lsb={lsb}, guard={guard}, sticky={target:b}, fmt={fmt}")
+                logger.exception(f"Div Failure for lsb={lsb}, guard={guard}, sticky={target:b}, fmt={fmt}")
                 continue
 
             s1, s2 = maybe_result
@@ -157,14 +160,14 @@ def generate_div_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO, targe
             if check_div_result(result, target, target_bits) and info["Guard"] == guard and info["LSB"] == lsb:
                 store_cover_vector(result, test_f, cover_f)
             else:
-                log_error(f"Div Result Failure, lsb={lsb}, guard={guard}, sticky={target:b}, fmt={fmt}")
+                logger.exception(f"Div Result Failure, lsb={lsb}, guard={guard}, sticky={target:b}, fmt={fmt}")
 
     for target_offset in range(4, 0, -1):
         target = (1 << target_bits) - target_offset
         for sign, lsb, guard in sign_lsb_guard():
             maybe_result = divideSetRounding(lsb, guard, target, target_bits, fmt)
             if not maybe_result:
-                log_error(f"Div Failure for lsb={lsb}, guard={guard}, sticky={target:b}, fmt={fmt}")
+                logger.exception(f"Div Failure for lsb={lsb}, guard={guard}, sticky={target:b}, fmt={fmt}")
                 continue
 
             s1, s2 = maybe_result
@@ -183,7 +186,7 @@ def generate_div_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO, targe
             if check_div_result(result, target, target_bits) and info["Guard"] == guard and info["LSB"] == lsb:
                 store_cover_vector(result, test_f, cover_f)
             else:
-                log_error(f"Div Result Failure, lsb={lsb}, guard={guard}, sticky={target:b}, fmt={fmt}")
+                logger.exception(f"Div Result Failure, lsb={lsb}, guard={guard}, sticky={target:b}, fmt={fmt}")
 
 
 def generate_mul_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> None:
@@ -218,7 +221,9 @@ def generate_mul_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> No
                 run_and_store_test_vector(tv, test_f, cover_f)
                 break
             else:
-                log_error(f"Mul Generation Failed: fmt={fmt}, lsb={lsb}, guard={guard}, extra_bits={target_sticky}")
+                logger.exception(
+                    f"Mul Generation Failed: fmt={fmt}, lsb={lsb}, guard={guard}, extra_bits={target_sticky}"
+                )
 
 
 def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> None:
@@ -292,7 +297,7 @@ def generate_add_sub_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
                 ):
                     store_cover_vector(result, test_f, cover_f)
                 else:
-                    log_error(
+                    logger.exception(
                         f"Add/Sub Generation Failed, fmt={fmt}, op={op}, guard={guard}, lsb={lsb}, "
                         f"extra_bits:{target_sticky}"
                     )
@@ -381,7 +386,7 @@ def generate_fma_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -> No
                         store_cover_vector(result, test_f, cover_f)
                         break
                     else:
-                        log_error(
+                        logger.exception(
                             f"FMA Generation Failed, fmt={fmt}, op={op}, guard={guard}, lsb={lsb},"
                             f" extra_bits:{sticky_target}"
                         )
@@ -440,7 +445,7 @@ def generate_convert_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
                 ) or (fmt == constants.FMT_QUAD and target_fmt == constants.FMT_BF16):
                     store_cover_vector(result, test_f, cover_f)
                 else:
-                    log_error(
+                    logger.exception(
                         f"CFF/CFI Generation Failed, fmt={fmt}, target_fmt={target_fmt}, lsb={lsb}, guard={guard}, "
                         f"extra_bits={extra_bits:b}"
                     )
@@ -480,7 +485,7 @@ def generate_convert_tests(fmt: str, rm: str, test_f: TextIO, cover_f: TextIO) -
                 ) or fmt == constants.FMT_BF16:
                     store_cover_vector(result, test_f, cover_f)
                 else:
-                    log_error(
+                    logger.exception(
                         f"CIF Generation Failed, from_fmt={from_fmt}, fmt={fmt}, lsb={lsb}, guard={guard}, "
                         f"extra_bits={extra_bits:b}"
                     )

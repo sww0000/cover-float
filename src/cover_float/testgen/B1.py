@@ -1,9 +1,12 @@
-from typing import TextIO
+import logging
+from typing import TextIO, cast
 
 import cover_float.common.constants as const
-from cover_float.common.log import log_info
+import cover_float.common.log as log
 from cover_float.reference import run_and_store_test_vector
 from cover_float.testgen.model import register_model
+
+logger: log.ModelLogger = cast(log.ModelLogger, logging.getLogger("B1"))
 
 SRC1_OPS = [const.OP_SQRT, const.OP_CLASS]
 
@@ -278,7 +281,7 @@ def write1SrcTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     print("// 1 source operations, all basic type input combinations", file=test_f)
     # print("//", file=f)
     for op in SRC1_OPS:
-        log_info(f"OP IS: {op}")
+        logger.status(f"OP IS: {op}")
         # print(f"FMT IS: {fmt}")
         for val in BASIC_TYPES[fmt]:
             run_and_store_test_vector(
@@ -294,7 +297,7 @@ def writeCvtTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     print("// 1 source convert operations, all basic type input and result format combinations", file=test_f)
     # print("//", file=f)
     for op in CVT_OPS:
-        log_info(f"OP IS: {op}")
+        logger.status(f"OP IS: {op}")
         # print(f"FMT IS: {fmt}")
         fmts = const.FLOAT_FMTS if op == const.OP_CFF else const.INT_FMTS
         for resultFmt in fmts:
@@ -311,7 +314,7 @@ def write2SrcTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     print("// 2 source operations, all basic type input combinations", file=test_f)
     for op in SRC2_OPS:
-        log_info(f"OP IS: {op}")
+        logger.status(f"OP IS: {op}")
         for val1 in BASIC_TYPES[fmt]:
             for val2 in BASIC_TYPES[fmt]:
                 run_and_store_test_vector(
@@ -325,7 +328,7 @@ def write3SrcTests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
     print("// 3 source operations, all basic type input combinations", file=test_f)
     for op in SRC3_OPS:
-        log_info(f"OP IS: {op}")
+        logger.status(f"OP IS: {op}")
         for val1 in BASIC_TYPES[fmt]:
             for val2 in BASIC_TYPES[fmt]:
                 for val3 in BASIC_TYPES[fmt]:

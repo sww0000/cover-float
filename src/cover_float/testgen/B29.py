@@ -1,13 +1,16 @@
 # B29 (rwolk@g.hmc.edu)
 
+import logging
 import random
-from typing import TextIO
+from typing import TextIO, cast
 
 import cover_float.common.constants as constants
-from cover_float.common.log import log_error
+import cover_float.common.log as log
 from cover_float.common.util import generate_float, generate_test_vector, reproducible_hash, unpack_test_vector
 from cover_float.reference import run_test_vector, store_cover_vector
 from cover_float.testgen.model import register_model
+
+logger: log.ModelLogger = cast(log.ModelLogger, logging.getLogger("B1"))
 
 
 def generate_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
@@ -55,7 +58,7 @@ def generate_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
             if computed_info == target:
                 store_cover_vector(results, test_f, cover_f)
             else:
-                log_error(f"fmt={fmt} and target={target}")
+                logger.exception(f"Failed to Generate for fmt={fmt} and target={target}")
 
 
 @register_model("B29")

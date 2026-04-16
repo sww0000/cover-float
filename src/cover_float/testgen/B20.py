@@ -1,14 +1,17 @@
 # B20 (rwolk@g.hmc.edu)
 
+import logging
 import math
 import random
-from typing import TextIO
+from typing import TextIO, cast
 
 import cover_float.common.constants as constants
-from cover_float.common.log import log_error
+import cover_float.common.log as log
 from cover_float.common.util import generate_float, generate_test_vector, reproducible_hash, unpack_test_vector
 from cover_float.reference import run_and_store_test_vector, run_test_vector, store_cover_vector
 from cover_float.testgen.model import register_model
+
+logger: log.ModelLogger = cast(log.ModelLogger, logging.getLogger("B1"))
 
 
 def generate_div_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
@@ -43,7 +46,9 @@ def generate_div_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
         # Extract Number of trailing zeros for verification
         generated_trailing_zeros = len(bin(res)) - len(bin(res).rstrip("0"))
         if generated_trailing_zeros != trailing_zeros:
-            log_error(f"Failed to Generate A Div Result for format {fmt} with exactly {trailing_zeros} trailing_zeros")
+            logger.exception(
+                f"Failed to Generate A Div Result for format {fmt} with exactly {trailing_zeros} trailing_zeros"
+            )
             continue
 
         exp1, exp2 = random.randint(min_exp, max_exp), random.randint(min_exp, max_exp)
@@ -100,7 +105,7 @@ def generate_sqrt_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
         mantissa |= 1 << nf
 
         if mantissa != answer:
-            log_error(
+            logger.exception(
                 f"Failed to Generate a SQRT Value for format: {fmt} and number of trailing zeros: {trailing_zeros}"
             )
             continue

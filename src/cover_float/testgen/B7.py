@@ -9,11 +9,12 @@
 #   This excludes DIV and SQRT as targeting specific sticky values is impossible
 
 import functools
+import logging
 import random
-from typing import TYPE_CHECKING, Optional, TextIO
+from typing import TYPE_CHECKING, Optional, TextIO, cast
 
 import cover_float.common.constants as constants
-from cover_float.common.log import log_error, progress_bar
+import cover_float.common.log as log
 from cover_float.common.util import (
     bezout_inverse,
     factors_to_bit_width,
@@ -23,6 +24,8 @@ from cover_float.common.util import (
 )
 from cover_float.reference import run_test_vector, store_cover_vector
 from cover_float.testgen.model import register_model
+
+logger: log.ModelLogger = cast(log.ModelLogger, logging.getLogger("B7"))
 
 if TYPE_CHECKING:
     # This block is seen by Pyright but ignored at runtime
@@ -80,7 +83,7 @@ def add_sub_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
             rounding_bits = rounding_bits[:nf]
 
             if int(rounding_bits, 2) != 1 << (nf - extra_bit - 1):
-                log_error(f"Add Sub Generation Failed: extra_bit: {extra_bit}, op: {op}")
+                logger.exception(f"Add Sub Generation Failed: extra_bit: {extra_bit}, op: {op}")
             else:
                 store_cover_vector(result, test_f, cover_f)
 
@@ -172,7 +175,7 @@ def mul_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
             if hit_with_shift and hit_without_shift:
                 break
         else:
-            log_error(
+            logger.exception(
                 f"Failure to generate mul tests, fmt={fmt}, extra_bit={extra_bit}, hit_with_shift={hit_with_shift}, "
                 f"hit_without_shift={hit_without_shift}"
             )
@@ -417,9 +420,9 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
                     store_cover_vector(result, test_f, cover_f)
                     break
                 if actual_extra_bits[1:] == expected_extra_bits[1:]:
-                    log_error("Failure in FMA Test Generation, failed to create the expected bits")
+                    logger.exception("Failure in FMA Test Generation, failed to create the expected bits")
             else:
-                log_error("Failure to generate a Guard=0 Case in FMA Testgen")
+                logger.exception("Failure to generate a Guard=0 Case in FMA Testgen")
 
         # Now do the addend hanging off of the end of the mantissa
         # This will be the (2nf + 1)th extra bit
@@ -478,7 +481,7 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
                     store_cover_vector(result, test_f, cover_f)
                     break
             else:
-                log_error(
+                logger.exception(
                     f"Failure to generate big multiplication, small, far addend for fma with sticky = {overhang_extra}"
                     f" in fmt: {fmt}"
                 )
@@ -495,107 +498,106 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
         # the leading one from the multiplication mantissa is in the lsb
         placements: list[int] = []
 
-        for target_placement in progress_bar(
-            range(1, 2 * constants.MANTISSA_BITS[fmt]), desc=f"{fmt} FMA Target Placements", miniters=1
-        ):
-            # if target_placement > STICKY_LIMITS.get(fmt, 1000):
-            #     # The things that are possible within what softfloat gives us
-            #     break
+        with logger.status_reporter.progress_bar("B7", status=f"{fmt} FMA Target Placements", show_m_of_n=True) as pbar:
+            for target_placement in pbar.track(range(1, 2 * constants.MANTISSA_BITS[fmt])):
+                # if target_placement > STICKY_LIMITS.get(fmt, 1000):
+                #     # The things that are possible within what softfloat gives us
+                #     break
 
-            # We want the lowest possible exponent difference
-            shift_amount = max(3, target_placement - constants.MANTISSA_BITS[fmt] + 1)
-            target_location = target_placement - shift_amount
+                # We want the lowest possible exponent difference
+                shift_amount = max(3, target_placement - constants.MANTISSA_BITS[fmt] + 1)
+                target_location = target_placement - shift_amount
 
-            if target_placement < STICKY_LIMITS.get(fmt, 1000):
-                attempted_sigs = multiplicand_generator(
-                    target_location, shift_amount, effective_subtraction, constants.MANTISSA_BITS[fmt]
-                )
-            else:
-                attempted_sigs = None
+                if target_placement < STICKY_LIMITS.get(fmt, 1000):
+                    attempted_sigs = multiplicand_generator(
+                        target_location, shift_amount, effective_subtraction, constants.MANTISSA_BITS[fmt]
+                    )
+                else:
+                    attempted_sigs = None
 
-            if attempted_sigs is None:
-                if not effective_subtraction:
-                    sigA, sigB = one_placements[middle_one]
-                    exp_diff = target_placement - middle_one + constants.MANTISSA_BITS[fmt] + 1
-                    if exp_diff > constants.MANTISSA_BITS[fmt]:
-                        sigA, sigB = one_placements[lowest_one]
-                        exp_diff = target_placement - lowest_one + constants.MANTISSA_BITS[fmt] + 1
+                if attempted_sigs is None:
+                    if not effective_subtraction:
+                        sigA, sigB = one_placements[middle_one]
+                        exp_diff = target_placement - middle_one + constants.MANTISSA_BITS[fmt] + 1
+                        if exp_diff > constants.MANTISSA_BITS[fmt]:
+                            sigA, sigB = one_placements[lowest_one]
+                            exp_diff = target_placement - lowest_one + constants.MANTISSA_BITS[fmt] + 1
+
+                            if exp_diff > constants.MANTISSA_BITS[fmt]:
+                                continue
+                    else:
+                        # 1st attempt all ones in the significand
+                        target = (1 << 2 * constants.MANTISSA_BITS[fmt] + 1) - 1
+                        factors = cached_factorint(target)
+                        f1, f2 = factors_to_bit_width(factors, target, constants.MANTISSA_BITS[fmt] + 1)
+
+                        if f1 * f2 == target:
+                            sigA, sigB = f1, f2
+                            one_location = 2 * constants.MANTISSA_BITS[fmt]  # After the decimal point
+                        else:
+                            sigA = (1 << constants.MANTISSA_BITS[fmt] + 1) - 2
+                            sigB = (1 << constants.MANTISSA_BITS[fmt]) + 1
+                            # These are the second best thing we can do
+                            one_location = 2 * constants.MANTISSA_BITS[fmt] - 1
+
+                        exp_diff = target_placement - one_location + constants.MANTISSA_BITS[fmt] + 1
 
                         if exp_diff > constants.MANTISSA_BITS[fmt]:
                             continue
                 else:
-                    # 1st attempt all ones in the significand
-                    target = (1 << 2 * constants.MANTISSA_BITS[fmt] + 1) - 1
-                    factors = cached_factorint(target)
-                    f1, f2 = factors_to_bit_width(factors, target, constants.MANTISSA_BITS[fmt] + 1)
+                    sigA, sigB = attempted_sigs
+                    exp_diff = shift_amount
 
-                    if f1 * f2 == target:
-                        sigA, sigB = f1, f2
-                        one_location = 2 * constants.MANTISSA_BITS[fmt]  # After the decimal point
-                    else:
-                        sigA = (1 << constants.MANTISSA_BITS[fmt] + 1) - 2
-                        sigB = (1 << constants.MANTISSA_BITS[fmt]) + 1
-                        # These are the second best thing we can do
-                        one_location = 2 * constants.MANTISSA_BITS[fmt] - 1
+                # Randomized Exponents so that we get the desired exponent difference
+                prod_exp = random.randint(max(min_exp, min_exp - exp_diff), min(max_exp, max_exp - exp_diff))
+                add_exp = prod_exp + exp_diff
 
-                    exp_diff = target_placement - one_location + constants.MANTISSA_BITS[fmt] + 1
+                # Find two exponents that add to prod_exp
+                mul_exp1 = random.randint(max(min_exp, prod_exp - max_exp), min(max_exp, prod_exp - min_exp))
+                mul_exp2 = prod_exp - mul_exp1
 
-                    if exp_diff > constants.MANTISSA_BITS[fmt]:
-                        continue
-            else:
-                sigA, sigB = attempted_sigs
-                exp_diff = shift_amount
+                # Order doesn't matter so randomly swap them
+                if random.random() < 0.5:
+                    mul_exp1, mul_exp2 = mul_exp2, mul_exp1
 
-            # Randomized Exponents so that we get the desired exponent difference
-            prod_exp = random.randint(max(min_exp, min_exp - exp_diff), min(max_exp, max_exp - exp_diff))
-            add_exp = prod_exp + exp_diff
+                if random.random() < 0.5:
+                    sigA, sigB = sigB, sigA
 
-            # Find two exponents that add to prod_exp
-            mul_exp1 = random.randint(max(min_exp, prod_exp - max_exp), min(max_exp, prod_exp - min_exp))
-            mul_exp2 = prod_exp - mul_exp1
+                sigC = random.getrandbits(constants.MANTISSA_BITS[fmt] - 1)  # -1 to stop all carry chains
+                if effective_subtraction:
+                    sigC |= 1 << (constants.MANTISSA_BITS[fmt] - 1)
+                    sigC |= 1 << (constants.MANTISSA_BITS[fmt] - 2)  # Stop all borrow chains
 
-            # Order doesn't matter so randomly swap them
-            if random.random() < 0.5:
-                mul_exp1, mul_exp2 = mul_exp2, mul_exp1
+                if exp_diff == 0:
+                    add_exp -= 2
+                    sigC &= ~0b11
+                elif (sigA * sigB).bit_length() == (2 * constants.MANTISSA_BITS[fmt] + 2):
+                    pass
 
-            if random.random() < 0.5:
-                sigA, sigB = sigB, sigA
+                signA = random.randint(0, 1)
+                signB = signA
+                if op == constants.OP_FNMADD or op == constants.OP_FNMSUB:
+                    signB ^= 1
 
-            sigC = random.getrandbits(constants.MANTISSA_BITS[fmt] - 1)  # -1 to stop all carry chains
-            if effective_subtraction:
-                sigC |= 1 << (constants.MANTISSA_BITS[fmt] - 1)
-                sigC |= 1 << (constants.MANTISSA_BITS[fmt] - 2)  # Stop all borrow chains
+                signC = 0
 
-            if exp_diff == 0:
-                add_exp -= 2
-                sigC &= ~0b11
-            elif (sigA * sigB).bit_length() == (2 * constants.MANTISSA_BITS[fmt] + 2):
-                pass
+                floatA = generate_float(signA, mul_exp1, sigA ^ (1 << constants.MANTISSA_BITS[fmt]), fmt)
+                floatB = generate_float(signB, mul_exp2, sigB ^ (1 << constants.MANTISSA_BITS[fmt]), fmt)
+                floatC = generate_float(signC, add_exp, sigC, fmt)
 
-            signA = random.randint(0, 1)
-            signB = signA
-            if op == constants.OP_FNMADD or op == constants.OP_FNMSUB:
-                signB ^= 1
+                tv = generate_test_vector(op, floatA, floatB, floatC, fmt, fmt, constants.ROUND_MAX)
+                result = run_test_vector(tv)
 
-            signC = 0
+                interm_mantissa = bin(int("1" + result.split("_")[-2], 16))[3:]
+                actual_extra_bits = interm_mantissa[constants.MANTISSA_BITS[fmt] :]
+                placement = actual_extra_bits.rfind("1")
 
-            floatA = generate_float(signA, mul_exp1, sigA ^ (1 << constants.MANTISSA_BITS[fmt]), fmt)
-            floatB = generate_float(signB, mul_exp2, sigB ^ (1 << constants.MANTISSA_BITS[fmt]), fmt)
-            floatC = generate_float(signC, add_exp, sigC, fmt)
-
-            tv = generate_test_vector(op, floatA, floatB, floatC, fmt, fmt, constants.ROUND_MAX)
-            result = run_test_vector(tv)
-
-            interm_mantissa = bin(int("1" + result.split("_")[-2], 16))[3:]
-            actual_extra_bits = interm_mantissa[constants.MANTISSA_BITS[fmt] :]
-            placement = actual_extra_bits.rfind("1")
-
-            if (placement != target_placement) or actual_extra_bits.count("1") != 1:
-                log_error(f"Failed To Generate C +- Prod Cases for FMA, op={op}, target={target_placement}")
-                continue
-            elif placement not in placements:
-                placements.append(placement)
-                store_cover_vector(result, test_f, cover_f)
+                if (placement != target_placement) or actual_extra_bits.count("1") != 1:
+                    logger.exception(f"Failed To Generate C +- Prod Cases for FMA, op={op}, target={target_placement}")
+                    continue
+                elif placement not in placements:
+                    placements.append(placement)
+                    store_cover_vector(result, test_f, cover_f)
 
 
 def convert_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
@@ -628,7 +630,7 @@ def convert_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
             elif fmt == "04" and constants.MANTISSA_BITS[fmt] + extra_bit >= 23:
                 store_cover_vector(result, test_f, cover_f)  # This is just a quirk of how bf16 converts work
             else:
-                log_error(f"CFF Generation Failure From: {from_fmt}, To: {fmt}, Extra-Bits: {extra_bits:b}")
+                logger.exception(f"CFF Generation Failure From: {from_fmt}, To: {fmt}, Extra-Bits: {extra_bits:b}")
 
     # CFI
     for to_fmt in constants.INT_FMTS:
@@ -696,7 +698,7 @@ def convert_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
             ):
                 store_cover_vector(result, test_f, cover_f)  # Softfloat quirk makes it not track correctly here
             else:
-                log_error(f"CIF Generation Failure From: {from_fmt}, To: {fmt}, Extra-Bit: {extra_bit}")
+                logger.exception(f"CIF Generation Failure From: {from_fmt}, To: {fmt}, Extra-Bit: {extra_bit}")
 
 
 @register_model("B7")

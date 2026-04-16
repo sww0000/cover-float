@@ -13,10 +13,11 @@ Currently supports
 - Flags: 'x' if a flag is raised and '' if none
 """
 
+import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-from cover_float.common.log import progress_bar
+import cover_float.common.log as log
 
 FMT_SPECS: dict[str, dict[str, Any]] = {
     "00": {"name": "f16", "type": "float", "exp_bits": 5, "man_bits": 10, "bias": 15, "total_bits": 16},
@@ -274,6 +275,8 @@ def format_output(parsed: dict[str, Any]) -> str:
 
 
 def auto_parse(model_name: str, output_dir: str) -> None:
+    logger: log.ModelLogger = cast(log.ModelLogger, logging.getLogger(model_name))
+
     input_path = Path(output_dir) / "testvectors" / f"{model_name}_tv.txt"
     output_path = Path(output_dir) / "readable" / f"{model_name}_parsed.txt"
 
@@ -283,7 +286,7 @@ def auto_parse(model_name: str, output_dir: str) -> None:
     with input_path.open("r") as infile, output_path.open("w") as outfile:
         input_size = input_path.stat().st_size
 
-        with progress_bar(total=input_size, bar_format="{l_bar}{bar}| [{elapsed}/{remaining}]") as bar:
+        with logger.status_reporter.progress_bar(model_name, "Post Processing", total=input_size) as bar:
             for line in infile:
                 parsed = parse_test_vector(line)
 
@@ -291,6 +294,6 @@ def auto_parse(model_name: str, output_dir: str) -> None:
                     outfile.write(format_output(parsed) + "\n")
                     count += 1
 
-                bar.update(len(line))
+                bar.advance(len(line))
 
-    print(f"Parsed {count} {model_name} vectors to {output_path}")
+    logger.info(f"Parsed {count} {model_name} vectors to {output_path}")

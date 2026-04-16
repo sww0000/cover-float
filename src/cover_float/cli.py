@@ -1,9 +1,13 @@
 import argparse
+import logging
 from pathlib import Path
 
+import cover_float.common.log as log
 import cover_float.testgen as tg
 from cover_float.reference import run_test_vector
 from cover_float.scripts.parse_testvectors import format_output, parse_test_vector
+
+logging.basicConfig(level=logging.INFO)
 
 
 def main() -> None:
@@ -57,10 +61,11 @@ def testgen() -> None:
 
     output_dir = Path(args.output_dir)
 
-    if args.models is None:
-        for model in tg.model.GLOBAL_MODELS:
-            tg.model.GLOBAL_MODELS[model](output_dir)
-    else:
-        for model in args.models:
-            if model in tg.model.GLOBAL_MODELS:
-                tg.model.GLOBAL_MODELS[model](output_dir)
+    with log.StatusReporter() as logger:  # , ProcessPoolExecutor() as executor:
+        if args.models is None:
+            for model in tg.model.GLOBAL_MODELS:
+                tg.model.GLOBAL_MODELS[model](output_dir, logger)
+        else:
+            for model in args.models:
+                if model in tg.model.GLOBAL_MODELS:
+                    tg.model.GLOBAL_MODELS[model](output_dir, logger)

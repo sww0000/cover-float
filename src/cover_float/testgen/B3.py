@@ -1,8 +1,9 @@
+import logging
 import random
-from typing import Optional, TextIO
+from typing import Optional, TextIO, cast
 
 import cover_float.common.constants as common
-from cover_float.common.log import log_error
+import cover_float.common.log as log
 from cover_float.common.util import (
     extract_rounding_info,
     generate_float,
@@ -13,6 +14,8 @@ from cover_float.common.util import (
 )
 from cover_float.reference import run_test_vector, store_cover_vector
 from cover_float.testgen.model import register_model
+
+logger: log.ModelLogger = cast(log.ModelLogger, logging.getLogger("B3"))
 
 SRC1_OPS = [common.OP_SQRT]
 
@@ -192,7 +195,7 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
 
                 fields = unpack_test_vector(result)
                 if (sigA * sigB) != fields.fma_pre_addition:
-                    log_error(
+                    logger.exception(
                         "FMA PreAddition is being Incorrectly Calculated, Please Investigate"
                         f" {in1:x} * {in2:x} + {in3:x}"
                     )
@@ -200,7 +203,7 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 rounding = extract_rounding_info(result)
 
                 if rounding["Sticky"] != 0:
-                    log_error(
+                    logger.exception(
                         "FMA Sticky Bit Generation Failed! This should not happen, please investigate "
                         f"Inputs: signA={signA}, sigA={sigA:#x}, expA={expA}, signB={signB}, sigB={sigB:#x}, "
                         f"expB={expB}, fmt={fmt}, op={op}"
@@ -215,7 +218,9 @@ def write_fma_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                         break
             else:
                 # This catches a for loop that does not break, i.e. we don't hit every goal
-                log_error(f"FMA Generation Failed for fmt={fmt}, mode={mode}, with to_cover={to_cover} goals remaining")
+                logger.exception(
+                    f"FMA Generation Failed for fmt={fmt}, mode={mode}, with to_cover={to_cover} goals remaining"
+                )
 
 
 def write_add_sub_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
@@ -280,7 +285,7 @@ def write_add_sub_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 if info == target:
                     store_cover_vector(result, test_f, cover_f)
                 else:
-                    log_error(
+                    logger.exception(
                         f"AddSub test generation failed: op={op}, target={target}, last_digits={last_digits}, "
                         f"A={A}, B={B}"
                     )
@@ -344,7 +349,9 @@ def write_mul_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 if len(goals) == 0:
                     break
         else:
-            log_error(f"Failed to generate mul cover_vectors for fmt={fmt}, mode={mode}. Remaining cases {goals}")
+            logger.exception(
+                f"Failed to generate mul cover_vectors for fmt={fmt}, mode={mode}. Remaining cases {goals}"
+            )
 
 
 def write_sqrt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
@@ -404,7 +411,7 @@ def write_sqrt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
         info = extract_rounding_info(result)
 
         if info not in targets:
-            log_error(
+            logger.exception(
                 f"sqrt generation sticky bit generation failed, please investigate: mantissa={mantissa:x}, exp={exp}"
             )
 
@@ -414,7 +421,7 @@ def write_sqrt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
             gen_square = int(result_mul.split("_")[-6], 16)
 
             if float_ != gen_square:
-                log_error(f"sqrt float should have been: {gen_square:x}, was {float_:x}")
+                logger.exception(f"sqrt float should have been: {gen_square:x}, was {float_:x}")
                 return
         else:
             store_cover_vector(result, test_f, cover_f)
@@ -489,7 +496,7 @@ def write_div_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
             sig_quotient = (sig1_64) // sig2
 
             if sig_quotient * sig2 != sig1_64:
-                log_error(
+                logger.exception(
                     f"Failed to generate exact division result, please investigate: target={target} K={K}, "
                     f"odd_factors={odd_factors}, sig1={sig1:x}, sig2={sig2:x}"
                 )
@@ -526,7 +533,7 @@ def write_div_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
             """
 
             if info != target:
-                log_error(
+                logger.exception(
                     f"Failed to generate exact division result, please investigate: target={target}, K={K}, "
                     f"odd_factors={odd_factors}, sig1={sig1:x}, sig2={sig2:x}"
                 )
@@ -619,7 +626,7 @@ def write_cvt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                 }
 
                 if expected_result != info:
-                    log_error(
+                    logger.exception(
                         f"CFI Generation Unexpected Value, fmt={fmt}, target={target_fmt}, mode={mode},"
                         f"cvt_from={cvt_from:x}"
                     )
@@ -630,7 +637,7 @@ def write_cvt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                     if len(goals) == 0:
                         break
             else:
-                log_error(
+                logger.exception(
                     f"CFI Generation Failed: fmt={fmt}, target={target_fmt}, mode={mode}, remaining_goals={goals}"
                 )
 
@@ -670,7 +677,7 @@ def write_cvt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                     if len(goals) == 0:
                         break
             else:
-                log_error(
+                logger.exception(
                     f"CFF Generation Failed: fmt={fmt}, target_fmt={target_fmt}, mode={mode}, remaining_goals={goals}"
                 )
 
@@ -713,7 +720,9 @@ def write_cvt_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
                     if len(goals) == 0:
                         break
             else:
-                log_error(f"CIF Test Gen Failed: fmt={fmt}, from={target_fmt}, mode={mode}, remaining_goals={goals}")
+                logger.exception(
+                    f"CIF Test Gen Failed: fmt={fmt}, from={target_fmt}, mode={mode}, remaining_goals={goals}"
+                )
 
 
 @register_model("B3")
@@ -763,4 +772,6 @@ def main(test_f: TextIO, cover_f: TextIO) -> None:
                     if len(cover_goals) == 0:
                         break
                 else:
-                    log_error(f"Sticky=1 Random Generation Miss: op={op}, fmt={fmt}, goals_remaining={cover_goals}")
+                    logger.exception(
+                        f"Sticky=1 Random Generation Miss: op={op}, fmt={fmt}, goals_remaining={cover_goals}"
+                    )
