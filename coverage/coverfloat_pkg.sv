@@ -175,6 +175,12 @@ package coverfloat_pkg;
     parameter int SIZEOF_INT  = 32;
     parameter int SIZEOF_LONG = 64;
 
+    typedef struct {
+    int max_int_exp;
+    logic [111:0] max_int_mantissa;
+    logic [111:0] one_quarter;
+    } max_int_struct;
+
 
     // Helper functions for difficult coverpoints
 
@@ -530,4 +536,92 @@ package coverfloat_pkg;
         return unbiased_exp;
     endfunction
 
+    function automatic logic[7:0] get_max_int(
+        input logic [7:0] int_fmt
+    );
+    max_int_struct target_max_int;
+
+    case(int_fmt)
+        FMT_INT: begin
+            target_max_int.max_int_exp = 31;
+            target_max_int.max_int = {31{1'b1}};
+            target_max_int.one_quarter = '0;
+            target_max_int.one_quarter[82] = 1'b1;
+        end
+        FMT_UINT: begin
+            target_max_int.max_int_exp = 30;
+            target_max_int.max_int = {30{1'b1}};
+            target_max_int.one_quarter = '0;
+            target_max_int.one_quarter[81] = 1'b1;
+        end
+        FMT_LONG: begin
+            target_max_int.max_int_exp = 63;
+            target_max_int.max_int = {63{1'b1}};
+            target_max_int.one_quarter = '0;
+            target_max_int.one_quarter[46] = 1'b1;
+        end
+        FMT_ULONG: begin
+            target_max_int.max_int_exp = 62;
+            target_max_int.max_int = {62{1'b1}};
+            target_max_int.one_quarter = '0;
+            target_max_int.one_quarter[45] = 1'b1;
+        end
+        default: begin
+            target_max_int.max_int_exp = 0;
+            target_max_int.max_int = 0;
+        end
+    endcase
+    return target_max_int;
+    endfunction
+
+    function automatic int get_proximity_to_max_int(
+        input logic [127:0] input_val,
+        input logic [7:0] fp_fmt,
+        input logic [7:0] int_fmt
+    );
+
+    max_int_struct target_int = get_max_int(int_fmt);
+    input_exp = get_unbiased_exponent(a, fp_fmt);
+    logic [111:0] input_mantissa = input_val[111:0]
+
+    if(fp_fmt == FMT_DOUBLE) begin
+        input_mantissa = input_val[111:0] << 50
+    end
+    if(input_exp == target_int.max_int_exp) begin
+        if(input_mantissa == target_int.max_int_mantissa) begin
+            return 1;
+        end
+        elif(input_mantissa > target_int.max_int_mantissa) begin
+            if(input_mantissa <= (target_int.max_int_mantissa + target_int.one_quarter)) begin
+                return 2;
+            end
+            elif(input_mantissa <= (target_int.max_int_mantissa + 2 * target_int.one_quarter)) begin
+                return 3;
+            end
+            elif(input_mantissa <= (target_int.max_int_mantissa + 3 * target_int.one_quarter)) begin
+                return 4;
+            end
+        end
+        elif(input_mantissa < target_int.max_int_mantissa) begin
+            if(input_mantissa >= (target_int.max_int_mantissa - target_int.one_quarter)) begin
+                return 2;
+            end
+            elif(input_mantissa >= (target_int.max_int_mantissa - (2 * target_int.one_quarter))) begin
+                return 3;
+            end
+            elif(input_mantissa >= (target_int.max_int_mantissa - (3 * target_int.one_quarter))) begin
+                return 4;
+            end
+            elif(input_mantissa >= (target_int.max_int_mantissa - (4 * target_int.one_quarter))) begin
+                return 5;
+            end
+        end
+    end
+    elif (input_exp == target_int,max_int_mantissa + 1)begin
+        if(input_mantissa == '0) begin
+            return 5;
+        end
+    end
+    return 0;
+    endfunction
 endpackage
