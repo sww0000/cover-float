@@ -498,7 +498,7 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
         # the leading one from the multiplication mantissa is in the lsb
         placements: list[int] = []
 
-        with logger.status_reporter.progress_bar("B7", status=f"{fmt} FMA Target Placements", show_m_of_n=True) as pbar:
+        with logger.progress_bar("B7", status=f"{fmt} FMA Target Placements", show_m_of_n=True) as pbar:
             for target_placement in pbar.track(range(1, 2 * constants.MANTISSA_BITS[fmt])):
                 # if target_placement > STICKY_LIMITS.get(fmt, 1000):
                 #     # The things that are possible within what softfloat gives us

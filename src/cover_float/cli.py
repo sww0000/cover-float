@@ -1,5 +1,6 @@
 import argparse
 import logging
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import cover_float.common.log as log
@@ -61,11 +62,11 @@ def testgen() -> None:
 
     output_dir = Path(args.output_dir)
 
-    with log.StatusReporter() as logger:  # , ProcessPoolExecutor() as executor:
+    with log.StatusReporter() as logger, ProcessPoolExecutor() as executor:
         if args.models is None:
             for model in tg.model.GLOBAL_MODELS:
-                tg.model.GLOBAL_MODELS[model](output_dir, logger)
+                tg.model.GLOBAL_MODELS[model](output_dir, logger, executor)
         else:
             for model in args.models:
                 if model in tg.model.GLOBAL_MODELS:
-                    tg.model.GLOBAL_MODELS[model](output_dir, logger)
+                    tg.model.GLOBAL_MODELS[model](output_dir, logger, executor)

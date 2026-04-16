@@ -60,7 +60,7 @@ def generate_b14_tests(test_f: TextIO, cover_f: TextIO, fmt: str) -> None:
     start_shift = -limit
     end_shift = limit
 
-    with logger.status_reporter.progress_bar("B14", f"{fmt} Shifts") as pbar:
+    with logger.progress_bar("B14", f"{fmt} Shifts", show_m_of_n=True) as pbar:
         for target_shift in pbar.track(range(start_shift, end_shift + 1)):
             for op in OPS:
                 hashval = reproducible_hash(op + fmt + "b14")  # Unique hash for (op, fmt) seed

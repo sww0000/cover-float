@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Generator, Iterable
+import logging.handlers
+import multiprocessing
+import threading
+import time
+from collections.abc import Generator, Iterable, Sized
 from contextlib import contextmanager
+from queue import Queue
 from types import TracebackType
 from typing import Any, Callable, TypeVar
 
@@ -24,7 +29,8 @@ logging.addLevelName(STATUS_LEVEL_NUM, "STATUS")
 
 
 class ModelLogger(logging.Logger):
-    status_reporter: StatusReporter
+    task_id: TaskID
+    msg_queue: Queue[Any]
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
@@ -32,6 +38,22 @@ class ModelLogger(logging.Logger):
     def status(self, message: str, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
         if self.isEnabledFor(STATUS_LEVEL_NUM):
             self._log(STATUS_LEVEL_NUM, message, args, **kwargs)
+
+    @contextmanager
+    def progress_bar(
+        self, model_name: str, status: str | None = None, *, total: float | None = 100, show_m_of_n: bool = False
+    ) -> Generator[BarHandle, None, None]:
+        handle = BarHandle(self.msg_queue, self.task_id)
+
+        if status is not None:
+            handle.update(total=total, completed=0, status=status, m_of_n=show_m_of_n)
+        else:
+            handle.update(total=total, completed=0, m_of_n=show_m_of_n)
+
+        try:
+            yield handle
+        finally:
+            handle.update(total=None, completed=0, m_of_n=False)
 
 
 logging.setLoggerClass(ModelLogger)
@@ -51,13 +73,14 @@ T = TypeVar("T")
 
 
 class BarHandle:
-    def __init__(self, progress: Progress, task_id: TaskID) -> None:
-        self._progress = progress
+    def __init__(self, queue: Queue[Any], task_id: TaskID) -> None:
+        self._queue = queue
         self._task_id = task_id
 
     # Match Progress.advance exactly
     def advance(self, advance: float = 1) -> None:
-        self._progress.advance(self._task_id, advance)
+        # self._progress.advance(self._task_id, advance)
+        self._queue.put({"action": "advance", "args": [self._task_id, advance], "kwargs": {}})
 
     # Match Progress.update exactly — forward all kwargs through
     def update(
@@ -71,15 +94,31 @@ class BarHandle:
         refresh: bool = False,
         **fields: Any,  # noqa: ANN401
     ) -> None:
-        self._progress.update(
-            self._task_id,
-            total=total,
-            completed=completed,
-            advance=advance,
-            description=description,
-            visible=visible,
-            refresh=refresh,
-            **fields,
+        # self._progress.update(
+        #     self._task_id,
+        #     total=total,
+        #     completed=completed,
+        #     advance=advance,
+        #     description=description,
+        #     visible=visible,
+        #     refresh=refresh,
+        #     **fields,
+        # )
+
+        self._queue.put(
+            {
+                "action": "update",
+                "args": [self._task_id],
+                "kwargs": {
+                    "total": total,
+                    "completed": completed,
+                    "advance": advance,
+                    "description": description,
+                    "visible": visible,
+                    "refresh": refresh,
+                    **fields,
+                },
+            }
         )
 
     def track(
@@ -88,17 +127,30 @@ class BarHandle:
         *,
         total: float | None = None,
         completed: int = 0,
-        description: str = "",
         update_period: float = 0.1,
     ) -> Iterable[T]:
-        return self._progress.track(
-            sequence,
-            task_id=self._task_id,
-            description=description,
-            total=total,
-            completed=completed,
-            update_period=update_period,
-        )
+        # return self._progress.track(
+        #     sequence,
+        #     task_id=self._task_id,
+        #     description=description,
+        #     total=total,
+        #     completed=completed,
+        #     update_period=update_period,
+        # )
+
+        if total is None and isinstance(sequence, Sized):
+            total = len(sequence)
+
+        last_update = time.monotonic() - update_period
+
+        for x in sequence:
+            yield x
+
+            now = time.monotonic()
+            completed += 1
+            if now - last_update >= update_period:
+                self.update(total=total, completed=completed)
+                last_update = now
 
 
 class OptionalColumn(ProgressColumn):
@@ -113,16 +165,53 @@ class OptionalColumn(ProgressColumn):
         return self._real_col.render(task)
 
 
+class LoggingHandler(logging.Handler):
+    def __init__(self, reporter: StatusReporter, model_name: str) -> None:
+        super().__init__()
+        self.reporter = reporter
+        self.model_name = model_name
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.reporter.status_update(self.model_name, record.msg)
+
+
+class AsyncLoggingHandler:
+    _SENTINEL = None
+
+    def __init__(self, reporter: StatusReporter, listen_to: Queue[Any]) -> None:
+        self.reporter = reporter
+        self.monitor_thread: threading.Thread | None = None
+        self.listen_to = listen_to
+
+    def start(self) -> None:
+        self.monitor_thread = threading.Thread(target=self.monitor_fn, daemon=True)
+        self.monitor_thread.start()
+
+    def stop(self) -> None:
+        self.listen_to.put(self._SENTINEL)
+        if self.monitor_thread:
+            self.monitor_thread.join()
+            self.monitor_thread = None
+
+    def monitor_fn(self) -> None:
+        while True:
+            record = self.listen_to.get(block=True)
+            if record is self._SENTINEL:
+                break
+
+            try:
+                action = record["action"]
+                if action == "update":
+                    self.reporter.progress.update(*record["args"], **record["kwargs"])
+                elif action == "advance":
+                    self.reporter.progress.advance(*record["args"], **record["kwargs"])
+                else:
+                    logging.info(f"Failed to Log {record}")
+            except Exception as e:
+                logging.info(f"Failed to Log {record}", exc_info=e)
+
+
 class StatusReporter:
-    class _LoggingHandler(logging.Handler):
-        def __init__(self, reporter: StatusReporter, model_name: str) -> None:
-            super().__init__()
-            self.reporter = reporter
-            self.model_name = model_name
-
-        def emit(self, record: logging.LogRecord) -> None:
-            self.reporter.status_update(self.model_name, record.msg)
-
     def __init__(self) -> None:
         self.active_status_bars: dict[str, TaskID] = {}
         self.progress = Progress(
@@ -134,33 +223,34 @@ class StatusReporter:
             OptionalColumn(lambda t: t.total is not None, TextColumn("{task.percentage:>3.0f}%")),
         )
 
+        self.manager = multiprocessing.Manager()
+
+        self.progress_queue = self.manager.Queue()
+        self.logging_queue = self.manager.Queue()
+
+        # This is the actual handler that prints to console
+        self.rich_handler = RichHandler(show_time=True, markup=True)
+        self.queue_listener = logging.handlers.QueueListener(self.logging_queue, self.rich_handler)
+        logging.getLogger().addHandler(self.rich_handler)
+        logging.getLogger().propagate = False
+
+        self.progress_listener = AsyncLoggingHandler(self, self.progress_queue)
+
     def __enter__(self) -> StatusReporter:
         self.progress.start()
+        self.queue_listener.start()
+        self.progress_listener.start()
         return self
 
     def __exit__(self, exc_type: type | None, exc_value: Exception | None, traceback: TracebackType | None) -> None:
+        self.queue_listener.stop()
+        self.progress_listener.stop()
         self.progress.stop()
 
-    def start_model(self, model_name: str) -> None:
+    def start_model(self, model_name: str) -> TaskID:
         task_id = self.progress.add_task(f"{model_name}: ", status="Test Generation", total=None)
         self.active_status_bars[model_name] = task_id
-        model_logger = logging.getLogger(model_name)
-
-        if isinstance(model_logger, ModelLogger):
-            model_logger.status_reporter = self
-
-        model_logger.handlers = []
-        model_logger.propagate = False
-
-        # Handle Status Updates
-        handler = self._LoggingHandler(self, model_name)
-        handler.addFilter(OnlyStatusFilter())
-        model_logger.addHandler(handler)
-
-        # Handle Other Updates
-        general_handler = RichHandler()
-        general_handler.addFilter(ExcludeStatusFilter())
-        model_logger.addHandler(general_handler)
+        return task_id
 
     def stop_model(self, model_name: str) -> None:
         self.progress.remove_task(self.active_status_bars[model_name])
@@ -169,19 +259,3 @@ class StatusReporter:
     def status_update(self, model_name: str, status_message: str) -> None:
         task = self.active_status_bars[model_name]
         self.progress.update(task, status=status_message)
-
-    @contextmanager
-    def progress_bar(
-        self, model_name: str, status: str | None = None, *, total: float | None = 100, show_m_of_n: bool = False
-    ) -> Generator[BarHandle, None, None]:
-        task_id = self.active_status_bars[model_name]
-
-        if status is not None:
-            self.progress.update(task_id, total=total, completed=0, status=status, m_of_n=show_m_of_n)
-        else:
-            self.progress.update(task_id, total=total, completed=0, m_of_n=show_m_of_n)
-
-        try:
-            yield BarHandle(self.progress, task_id)
-        finally:
-            self.progress.update(task_id, total=None, completed=0, m_of_n=False)
