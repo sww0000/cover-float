@@ -43,6 +43,7 @@ package coverfloat_pkg;
     const logic [31:0] OP_FSGNJ  = 32'h10_1;
     const logic [31:0] OP_FSGNJN = 32'h10_2;
     const logic [31:0] OP_FSGNJX = 32'h10_3;
+    const logic [32:0] OP_RFI    = 32'h11_0;
 
     // const logic [31:0] OP_
 
@@ -174,6 +175,19 @@ package coverfloat_pkg;
 
     parameter int SIZEOF_INT  = 32;
     parameter int SIZEOF_LONG = 64;
+
+    // Some Constants For B28
+    parameter int F32_RFI_MAX = (F32_EXP_BIAS + F32_M_BITS) << (F32_M_BITS) | ((1 << F32_M_BITS) - 1); // 'h4b7fffff
+    parameter int F64_RFI_MAX = (F64_EXP_BIAS + F64_M_BITS) << (F64_M_BITS) | ((1 << F64_M_BITS) - 1);
+    parameter int F128_RFI_MAX = (F128_EXP_BIAS + F128_M_BITS) << (F128_M_BITS) | ((1 << F128_M_BITS) - 1);
+    parameter int F16_RFI_MAX = (F16_EXP_BIAS + F16_M_BITS) << (F16_M_BITS) | ((1 << F16_M_BITS) - 1);
+    parameter int BF16_RFI_MAX = (BF16_EXP_BIAS + BF16_M_BITS) << (BF16_M_BITS) | ((1 << BF16_M_BITS) - 1);
+
+    parameter int F32_ONE = (F32_EXP_BIAS) << F32_M_BITS; // 'h3f800000
+    parameter int F64_ONE = (F64_EXP_BIAS) << F64_M_BITS; // 'h3f800000
+    parameter int F128_ONE = (F128_EXP_BIAS) << F128_M_BITS; // 'h3f800000
+    parameter int F16_ONE = (F16_EXP_BIAS) << F16_M_BITS; // 'h3f800000
+    parameter int BF16_ONE = (BF16_EXP_BIAS) << BF16_M_BITS; // 'h3f800000
 
 
     // Helper functions for difficult coverpoints
