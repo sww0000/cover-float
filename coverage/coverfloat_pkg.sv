@@ -174,8 +174,10 @@ package coverfloat_pkg;
 
     parameter int SIZEOF_INT  = 32;
     parameter int SIZEOF_LONG = 64;
-    parameter int INT_TRAILING_ZEROS = F128_M_BITS - SIZEOF_INT
-    parameter int LONG_TRAILING_ZEROS = F128_M_BITS - SIZEOF_LONG
+    parameter int UINT_TRAILING_ZEROS = F128_M_BITS - SIZEOF_INT + 1;//add 1 because of hidden 1
+    parameter int INT_TRAILING_ZEROS = F128_M_BITS - SIZEOF_INT + 2;//hidden1 + 1
+    parameter int LONG_TRAILING_ZEROS = F128_M_BITS - SIZEOF_LONG + 2;//hidden1 + 1
+    parameter int ULONG_TRAILING_ZEROS = F128_M_BITS - SIZEOF_LONG + 1;//hidden1
 
     typedef struct {
     int max_int_exp;
@@ -551,35 +553,35 @@ package coverfloat_pkg;
     case(int_fmt)
         FMT_UINT: begin
             target_max_int.max_int_exp = (SIZEOF_INT - 1);//2^31
-            target_max_int.max_int = F128_M_BITS'({(SIZEOF_INT){1'b1}}) << (F128_M_BITS - SIZEOF_INT);//upper 32 bits are 1s, lower bits are 0s
-            target_max_int.one_quarter = F128_M_BITS'(1'b1) << (INT_TRAILING_ZEROS - 2);//32 0s, 01
-            target_max_int.one_half = F128_M_BITS'(1'b1) << (INT_TRAILING_ZEROS - 1);//32 0s, 1
-            target_max_int.three_quarters = F128_M_BITS'(2'b11) << (INT_TRAILING_ZEROS - 2);//32 0s, 11
-            target_max_int.one = F128_M_BITS'(1'b1) << INT_TRAILING_ZEROS;//31 0s, 1
+            target_max_int.max_int_mantissa = F128_M_BITS'({(SIZEOF_INT - 1){1'b1}}) << (UINT_TRAILING_ZEROS);//upper 31 bits are 1s, lower bits are 0s; 31 bits because of hidden 1
+            target_max_int.one_quarter = F128_M_BITS'(1'b1) << (UINT_TRAILING_ZEROS - 2);//31 0s, 01
+            target_max_int.one_half = F128_M_BITS'(1'b1) << (UINT_TRAILING_ZEROS - 1);//31 0s, 1
+            target_max_int.three_quarters = F128_M_BITS'(2'b11) << (UINT_TRAILING_ZEROS - 2);//31 0s, 11
+            target_max_int.one = F128_M_BITS'(1'b1) << UINT_TRAILING_ZEROS;//30 0s, 1
         end
         FMT_INT: begin
             target_max_int.max_int_exp = (SIZEOF_INT - 2);//2^30
-            target_max_int.max_int = F128_M_BITS'({(SIZEOF_INT - 1){1'b1}}) << (F128_M_BITS - SIZEOF_INT);//leading 0, next 31 bits are 1s, lower bits are 0s
-            target_max_int.one_quarter = F128_M_BITS'(1'b1) << (INT_TRAILING_ZEROS - 2);//32 0s, 01
-            target_max_int.one_half = F128_M_BITS'(1'b1) << (INT_TRAILING_ZEROS - 1);//32 0s, 1
-            target_max_int.three_quarters = F128_M_BITS'(2'b11) << (INT_TRAILING_ZEROS - 2);//32 0s, 11
-            target_max_int.one = F128_M_BITS'(1'b1) << INT_TRAILING_ZEROS;//31 0s, 1
+            target_max_int.max_int_mantissa = F128_M_BITS'({(SIZEOF_INT - 2){1'b1}}) << (INT_TRAILING_ZEROS);//leading 0, next 31 bits are 1s, lower bits are 0s
+            target_max_int.one_quarter = F128_M_BITS'(1'b1) << (INT_TRAILING_ZEROS - 2);//30 0s, 01
+            target_max_int.one_half = F128_M_BITS'(1'b1) << (INT_TRAILING_ZEROS - 1);//30 0s, 1
+            target_max_int.three_quarters = F128_M_BITS'(2'b11) << (INT_TRAILING_ZEROS - 2);//30 0s, 11
+            target_max_int.one = F128_M_BITS'(1'b1) << INT_TRAILING_ZEROS;//30 0s, 1
         end
         FMT_ULONG: begin
             target_max_int.max_int_exp = (SIZEOF_LONG - 1);//2^63
-            target_max_int.max_int = F128_M_BITS'({(SIZEOF_LONG){1'b1}}) << (F128_M_BITS - SIZEOF_LONG);//upper 64 bits are 1s, lower bits are 0s
-            target_max_int.one_quarter = F128_M_BITS'(1'b1) << (LONG_TRAILING_ZEROS - 2);//64 0s, 01
-            target_max_int.one_half = F128_M_BITS'(1'b1) << (LONG_TRAILING_ZEROS - 1);//64 0s, 1
-            target_max_int.three_quarters = F128_M_BITS'(2'b11) << (LONG_TRAILING_ZEROS - 2);//64 0s, 11
-            target_max_int.one = F128_M_BITS'(1'b1) << LONG_TRAILING_ZEROS;//63 0s, 1
+            target_max_int.max_int_mantissa = F128_M_BITS'({(SIZEOF_LONG - 1){1'b1}}) << (ULONG_TRAILING_ZEROS);//upper 63 bits are 1s, lower bits are 0s
+            target_max_int.one_quarter = F128_M_BITS'(1'b1) << (ULONG_TRAILING_ZEROS - 2);//63 0s, 01
+            target_max_int.one_half = F128_M_BITS'(1'b1) << (ULONG_TRAILING_ZEROS - 1);//63 0s, 1
+            target_max_int.three_quarters = F128_M_BITS'(2'b11) << (ULONG_TRAILING_ZEROS - 2);//63 0s, 11
+            target_max_int.one = F128_M_BITS'(1'b1) << ULONG_TRAILING_ZEROS;//62 0s, 1
         end
         FMT_LONG: begin
             target_max_int.max_int_exp = (SIZEOF_LONG - 2);//2^62
-            target_max_int.max_int = F128_M_BITS'({(SIZEOF_LONG - 1){1'b1}}) << (F128_M_BITS - SIZEOF_LONG);//leading 0, upper 63 bits are 1s, lower bits are 0s
-            target_max_int.one_quarter = F128_M_BITS'(1'b1) << (LONG_TRAILING_ZEROS - 2);//64 0s, 01
-            target_max_int.one_half = F128_M_BITS'(1'b1) << (LONG_TRAILING_ZEROS - 1);//64 0s, 1
-            target_max_int.three_quarters = F128_M_BITS'(2'b11) << (LONG_TRAILING_ZEROS - 2);//64 0s, 11
-            target_max_int.one = F128_M_BITS'(1'b1) << LONG_TRAILING_ZEROS;//63 0s, 1
+            target_max_int.max_int_mantissa = F128_M_BITS'({(SIZEOF_LONG - 2){1'b1}}) << (LONG_TRAILING_ZEROS);//leading 0, upper 62 bits are 1s, lower bits are 0s
+            target_max_int.one_quarter = F128_M_BITS'(1'b1) << (LONG_TRAILING_ZEROS - 2);//62 0s, 01
+            target_max_int.one_half = F128_M_BITS'(1'b1) << (LONG_TRAILING_ZEROS - 1);//62 0s, 1
+            target_max_int.three_quarters = F128_M_BITS'(2'b11) << (LONG_TRAILING_ZEROS - 2);//62 0s, 11
+            target_max_int.one = F128_M_BITS'(1'b1) << LONG_TRAILING_ZEROS;//61 0s, 1
         end
         default: begin//fill everything with 0s if an unrecognized int_fmt
             target_max_int.max_int_exp = 0;
@@ -606,7 +608,7 @@ package coverfloat_pkg;
     //Shift the double mantissa so the mantissa fills the upper bits
     //This allows for one comparison regardless of whether the input is double or quad
     if(fp_fmt == FMT_DOUBLE) begin
-        input_mantissa = 112'(input_val[F64_M_UPPER:0]) << (F128_M_BITS - F64_M_BITS);
+        input_mantissa = F128_M_BITS'(input_val[F64_M_UPPER:0]) << (F128_M_BITS - F64_M_BITS);
     end
 
     //Comparison, returns the number corresponding to the test that each condition satisfies
@@ -618,29 +620,29 @@ package coverfloat_pkg;
             if(input_mantissa <= (target_int.max_int_mantissa + target_int.one_quarter)) begin
                 return 2;//+-MaxInt + (1/4)
             end
-            elif(input_mantissa <= (target_int.max_int_mantissa + target_int.one_half)) begin
+            else if(input_mantissa <= (target_int.max_int_mantissa + target_int.one_half)) begin
                 return 3;//+-MaxInt + (1/2)
             end
-            elif(input_mantissa <= (target_int.max_int_mantissa + target_int.three_quarters)) begin
+            else if(input_mantissa <= (target_int.max_int_mantissa + target_int.three_quarters)) begin
                 return 4;//+-MaxInt + (3/4)
             end
         end
-        elif(input_mantissa < target_int.max_int_mantissa) begin
+        else if(input_mantissa < target_int.max_int_mantissa) begin
             if(input_mantissa >= (target_int.max_int_mantissa - target_int.one_quarter)) begin
                 return 2;//+-MaxInt - (1/4)
             end
-            elif(input_mantissa >= (target_int.max_int_mantissa - target_int.one_half)) begin
+            else if(input_mantissa >= (target_int.max_int_mantissa - target_int.one_half)) begin
                 return 3;//+-MaxInt - (1/2)
             end
-            elif(input_mantissa >= (target_int.max_int_mantissa - target_int.three_quarters)) begin
+            else if(input_mantissa >= (target_int.max_int_mantissa - target_int.three_quarters)) begin
                 return 4;//+-MaxInt - (3/4)
             end
-            elif(input_mantissa >= (target_int.max_int_mantissa - target_int.one)) begin
+            else if(input_mantissa >= (target_int.max_int_mantissa - target_int.one)) begin
                 return 5;//+-MaxInt - 1
             end
         end
     end
-    elif (input_exp == target_int.max_int_mantissa + 1)begin
+    else if (input_exp == target_int.max_int_exp + 1)begin
         if(input_mantissa == '0) begin
             return 5;//+- MaxInt + 1
         end

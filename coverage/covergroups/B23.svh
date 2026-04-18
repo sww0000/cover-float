@@ -64,7 +64,7 @@ covergroup B23_cg (virtual coverfloat_interface CFI);
         bins max_int_plus_one = {5};
     }
 
-    proximity_to_max_slong64: coverpoint $signed(get_proximity_to_max_int(CFI.a, CFI.operandFmt, FMT_LONG)){
+    proximity_to_max_long64: coverpoint $signed(get_proximity_to_max_int(CFI.a, CFI.operandFmt, FMT_LONG)){
         type_option.weight = 0;
 
         bins max_int = {1};
@@ -192,19 +192,19 @@ covergroup B23_cg (virtual coverfloat_interface CFI);
     //FMT_DOUBLE
     //sufficient exponent and mantissa range to reach all values
     `ifdef COVER_F64
-        B64_F64_INT: cross F64_input_fmt, FP2INT_op, proximity_to_max_int_32, result_int32_fm;
-        B23_F64_UINT: cross F64_input_fmt, FP2INT_op, proximity_to_max_uint_32, result_uint32_fmt;
+        B64_F64_INT: cross F64_input_fmt, FP2INT_op, proximity_to_max_int32, result_int32_fmt;
+        B23_F64_UINT: cross F64_input_fmt, FP2INT_op, proximity_to_max_uint32, result_uint32_fmt;
         `ifdef COVER_LONG
-            B23_F64_LONG: cross F64_input_fmt, FP2INT_op, proximity_to_max_long_64, result_long64_fmt;
-            B23_F64_LONG: cross F64_input_fmt, FP2INT_op, proximity_to_max_ulong_64, result_ulong64_fmt;
+            B23_F64_LONG: cross F64_input_fmt, FP2INT_op, proximity_to_max_long64, result_long64_fmt;
+            B23_F64_ULONG: cross F64_input_fmt, FP2INT_op, proximity_to_max_ulong64, result_ulong64_fmt;
         `endif
     `endif
 
     //FMT_QUAD
     //sufficient exponent and mantissa range to reach all values
     `ifdef COVER_F128
-        B23_F128_INT: cross F128_input_fmt, FP2INT_op, proximity_to_max_int_32, result_int32_fmt;
-        B23_F128_UINT: cross F128_input_fmt, FP2INT_op, proximity_to_max_uint_32, result_uint32_fmt;
+        B23_F128_INT: cross F128_input_fmt, FP2INT_op, proximity_to_max_int32, result_int32_fmt;
+        B23_F128_UINT: cross F128_input_fmt, FP2INT_op, proximity_to_max_uint32, result_uint32_fmt;
         `ifdef COVER_LONG
             B23_F128_LONG: cross F128_input_fmt, FP2INT_op, proximity_to_max_long64, result_long64_fmt;
             B23_F128_ULONG: cross F128_input_fmt, FP2INT_op, proximity_to_max_ulong64, result_ulong64_fmt;
