@@ -647,7 +647,7 @@ The cells (>, <), (>, =), (<, >), (<, =) are impossible except the five rows sho
 |
 |===
 
-*Total per precision:* 1 cell × 4 sign combos = **4**
+*Total per precision:* 2 cells × 4 sign combos = **8**
 
 ==== Impossibility reasoning
 
@@ -724,7 +724,7 @@ Subnormal numbers have effective exponents that are strictly negative, while zer
 |
 |===
 
-*Total per precision:* 1 cell × 4 sign combos = **4**
+*Total per precision:* 2 cell × 4 sign combos = **8**
 
 ==== Impossibility reasoning
 
@@ -856,15 +856,15 @@ The 4 vectors come from the 4 sign combinations: (+0,+0), (+0,−0), (−0,+0), 
 
 | 7
 | Zero × Subnormal
-| 1
+| 2
 | × 4
-| 4
+| 8
 
 | 8
 | Subnormal × Zero
-| 1
+| 2
 | × 4
-| 4
+| 8
 
 | 9
 | Zero × Zero
@@ -876,7 +876,7 @@ The 4 vectors come from the 4 sign combinations: (+0,+0), (+0,−0), (−0,+0), 
 |
 |
 | *Total per (fmt, op):*
-| *108*
+| *116*
 |===
 
 === Grand Total Breakdown
@@ -886,22 +886,22 @@ The 4 vectors come from the 4 sign combinations: (+0,+0), (+0,−0), (−0,+0), 
 | Format | Total vectors
 
 | BF_16
-| 108 per op × 5 ops = 540
+| 116 per op × 5 ops = 580
 
 | FP_16
-| 108 per op × 5 ops = 540
+| 116 per op × 5 ops = 580
 
 | FP_32
-| 108 per op × 5 ops = 540
+| 116 per op × 5 ops = 580
 
 | FP_64
-| 108 per op × 5 ops = 540
+| 116 per op × 5 ops = 580
 
 | FP_128
-| 108 per op × 5 ops = 540
+| 116 per op × 5 ops = 580
 
 |
-| *Grand Total: 2700*
+| *Grand Total: 2900*
 |===
 
 *Note:* Differs from Aharoni test count. Aharoni reports ~9 E 2 total; our count is higher because we enumerate all 4 sign combinations explicitly and implement 5 operations separately.
