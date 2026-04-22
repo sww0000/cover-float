@@ -40,7 +40,7 @@ class ModelLogger(logging.Logger):
 
     @contextmanager
     def progress_bar(
-        self, model_name: str, status: str | None = None, *, total: float | None = 100, show_m_of_n: bool = False
+        self, status: str | None = None, *, total: float | None = 100, show_m_of_n: bool = False
     ) -> Generator[BarHandle, None, None]:
         handle = BarHandle(self.msg_queue, self.task_id)
 
@@ -93,17 +93,6 @@ class BarHandle:
         refresh: bool = False,
         **fields: Any,  # noqa: ANN401
     ) -> None:
-        # self._progress.update(
-        #     self._task_id,
-        #     total=total,
-        #     completed=completed,
-        #     advance=advance,
-        #     description=description,
-        #     visible=visible,
-        #     refresh=refresh,
-        #     **fields,
-        # )
-
         self._queue.put(
             {
                 "action": "update",
@@ -128,15 +117,6 @@ class BarHandle:
         completed: int = 0,
         update_period: float = 0.1,
     ) -> Iterable[T]:
-        # return self._progress.track(
-        #     sequence,
-        #     task_id=self._task_id,
-        #     description=description,
-        #     total=total,
-        #     completed=completed,
-        #     update_period=update_period,
-        # )
-
         if total is None and isinstance(sequence, Sized):
             total = len(sequence)
 

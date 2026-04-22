@@ -499,7 +499,7 @@ def fma_tests(fmt: str, test_f: TextIO, cover_f: TextIO) -> None:
         # the leading one from the multiplication mantissa is in the lsb
         placements: list[int] = []
 
-        with logger.progress_bar("B7", status=f"{fmt} FMA Target Placements", show_m_of_n=True) as pbar:
+        with logger.progress_bar(status=f"{fmt} FMA Target Placements", show_m_of_n=True) as pbar:
             for target_placement in pbar.track(range(1, 2 * constants.MANTISSA_BITS[fmt])):
                 # We want the lowest possible exponent difference
                 shift_amount = max(3, target_placement - constants.MANTISSA_BITS[fmt] + 1)

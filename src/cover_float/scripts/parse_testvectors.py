@@ -290,7 +290,7 @@ def auto_parse(model_name: str, output_dir: str) -> None:
         last_update = time.monotonic()
         update_size = 0
 
-        with logger.progress_bar(model_name, "Post Processing", total=input_size) as bar:
+        with logger.progress_bar("Post Processing", total=input_size) as bar:
             for line in infile:
                 parsed = parse_test_vector(line)
 

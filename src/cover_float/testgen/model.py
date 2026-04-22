@@ -41,7 +41,6 @@ def _run_model_by_name(
     logging_queue: Queue[Any],
     post_process: bool,
 ) -> None:
-    """Module-level function that can be pickled for multiprocessing."""
     tv_path = output_dir / "testvectors" / f"{model_name}_tv.txt"
     cv_path = output_dir / "covervectors" / f"{model_name}_cv.txt"
 
@@ -60,7 +59,6 @@ def _run_model_by_name(
     model_logger.addHandler(handler)
 
     # Handle Other Updates
-    # general_handler = RichHandler()
     general_handler = logging.handlers.QueueHandler(logging_queue)
     general_handler.addFilter(log.ExcludeStatusFilter())
     model_logger.addHandler(general_handler)
