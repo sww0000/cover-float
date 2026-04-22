@@ -3,7 +3,7 @@ from pathlib import Path
 
 import cover_float.testgen as tg
 from cover_float.reference import run_test_vector
-from cover_float.scripts.parse_testvectors import format_output, parse_test_vector
+from cover_float.scripts.postprocess import postprocess_testvectors
 
 
 def main() -> None:
@@ -27,19 +27,10 @@ def main() -> None:
 
 
 def auto_parse(model_name: str, output_dir: str) -> None:
-    input_path = Path(output_dir) / "testvectors" / f"{model_name}_tv.txt"
-    output_path = Path(output_dir) / "readable" / f"{model_name}_parsed.txt"
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    count = 0
-    with input_path.open("r") as infile, output_path.open("w") as outfile:
-        for line in infile:
-            parsed = parse_test_vector(line)
-            if parsed:
-                outfile.write(format_output(parsed) + "\n")
-                count += 1
-    print(f"Parsed {count} {model_name} vectors to {output_path}")
+    output_directory = Path(output_dir)
+    postprocess_testvectors(
+        model_name, output_directory / "testvectors", output_directory / "processed", output_directory / "readable"
+    )
 
 
 def testgen() -> None:
