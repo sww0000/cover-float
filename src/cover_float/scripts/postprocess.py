@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import csv
+import logging
 import pathlib
+import time
 from dataclasses import dataclass
-from typing import TextIO
+from typing import TextIO, cast
 
-import rich.progress
-
+import cover_float.common.log as log
 from cover_float.common import constants
 from cover_float.common.util import unpack_test_vector
 from cover_float.scripts.parse_testvectors import format_output, parse_test_vector
@@ -91,6 +92,8 @@ def postprocess_testvectors(
     processed_vectors_dir: pathlib.Path,
     readable_vectors_dir: pathlib.Path,
 ) -> None:
+    logger: log.ModelLogger = cast(log.ModelLogger, logging.getLogger(model))
+
     test_vector_file = test_vector_location / f"{model}_tv.txt"
     readable_vectors_file = readable_vectors_dir / f"{model}_parsed.txt"
     processed_vectors: dict[str, tuple[csv.DictWriter[str], TextIO]] = {}
@@ -100,80 +103,89 @@ def postprocess_testvectors(
     file_size = test_vector_file.stat().st_size
     readable_vectors_file.parent.mkdir(parents=True, exist_ok=True)
 
-    with rich.progress.Progress() as progress:
-        task = progress.add_task(f"{model} Post-Processing: ", total=file_size)
+    with (
+        test_vector_file.open("r") as test_vectors,
+        readable_vectors_file.open("w") as readable_vectors,
+        logger.progress_bar("Post Processing", total=file_size) as bar,
+    ):
+        last_update = time.monotonic()
+        update_size = 0
 
-        with test_vector_file.open("r") as test_vectors, readable_vectors_file.open("w") as readable_vectors:
-            for line in test_vectors.readlines():
-                progress.advance(task, len(line))
+        for line in test_vectors.readlines():
+            parsed = parse_test_vector(line)
+            if parsed:
+                readable_vectors.write(format_output(parsed) + "\n")
 
-                parsed = parse_test_vector(line)
-                if parsed:
-                    readable_vectors.write(format_output(parsed) + "\n")
+            try:
+                unpacked = unpack_test_vector(line)
+            except ValueError:
+                continue
 
-                try:
-                    unpacked = unpack_test_vector(line)
-                except ValueError:
-                    continue
+            total += 1
 
-                total += 1
+            try:
+                operation_info = OP_TO_INSTRUCTION_INFO[unpacked.op.upper()]
+            except KeyError:
+                non_riscv += 1
+                continue
 
-                try:
-                    operation_info = OP_TO_INSTRUCTION_INFO[unpacked.op.upper()]
-                except KeyError:
-                    non_riscv += 1
-                    continue
+            if unpacked.rounding_mode == constants.ROUND_ODD:
+                non_riscv += 1
+                continue
 
-                if unpacked.rounding_mode == constants.ROUND_ODD:
-                    non_riscv += 1
-                    continue
+            operation = operation_info.name
 
-                operation = operation_info.name
+            input_fmt = RISCV_FMT_CODES[unpacked.output_format]
 
-                input_fmt = RISCV_FMT_CODES[unpacked.output_format]
+            instruction_code = operation + "." + input_fmt
+            if operation == "fcvt":
+                output_fmt = RISCV_FMT_CODES[unpacked.input_format]
+                instruction_code += "." + output_fmt
 
-                instruction_code = operation + "." + input_fmt
-                if operation == "fcvt":
-                    output_fmt = RISCV_FMT_CODES[unpacked.input_format]
-                    instruction_code += "." + output_fmt
+            if instruction_code not in processed_vectors:
+                processed_vector_path = processed_vectors_dir / instruction_code / f"{model}.csv"
+                processed_vector_path.parent.mkdir(parents=True, exist_ok=True)
+                file = processed_vector_path.open("w")
 
-                if instruction_code not in processed_vectors:
-                    processed_vector_path = processed_vectors_dir / instruction_code / f"{model}.csv"
-                    processed_vector_path.parent.mkdir(parents=True, exist_ok=True)
-                    file = processed_vector_path.open("w")
-
-                    csv_columns = [*operation_info.type.sources, operation_info.type.dest, *COMMON_OUTPUTS]
-                    if operation_info.name not in NO_ROUNDING_MODE_OPS:
-                        csv_columns.append("frm")
-
-                    writer = csv.DictWriter(file, csv_columns)
-
-                    writer.writeheader()
-                    processed_vectors[instruction_code] = (writer, file)
-
-                info: dict[str, str | int] = {
-                    "fflags": unpacked.flags,
-                }
-
+                csv_columns = [*operation_info.type.sources, operation_info.type.dest, *COMMON_OUTPUTS]
                 if operation_info.name not in NO_ROUNDING_MODE_OPS:
-                    info["frm"] = ROUNDING_MODE_TO_COMMON[unpacked.rounding_mode]
+                    csv_columns.append("frm")
 
-                for i, source in enumerate(operation_info.type.sources):
-                    if i == 0:
-                        info[source] = unpacked.input1
-                    elif i == 1:
-                        info[source] = unpacked.input2
-                    elif i == 2:
-                        info[source] = unpacked.input3
+                writer = csv.DictWriter(file, csv_columns)
 
-                info[operation_info.type.dest] = unpacked.result
+                writer.writeheader()
+                processed_vectors[instruction_code] = (writer, file)
 
-                processed_vectors[instruction_code][0].writerow(info)
+            info: dict[str, str | int] = {
+                "fflags": unpacked.flags,
+            }
+
+            if operation_info.name not in NO_ROUNDING_MODE_OPS:
+                info["frm"] = ROUNDING_MODE_TO_COMMON[unpacked.rounding_mode]
+
+            for i, source in enumerate(operation_info.type.sources):
+                if i == 0:
+                    info[source] = unpacked.input1
+                elif i == 1:
+                    info[source] = unpacked.input2
+                elif i == 2:
+                    info[source] = unpacked.input3
+
+            info[operation_info.type.dest] = unpacked.result
+
+            processed_vectors[instruction_code][0].writerow(info)
+
+            now = time.monotonic()
+            update_size += len(line)
+            if now - last_update >= 0.1:
+                bar.advance(update_size)
+                last_update = now
+                update_size = 0
 
     for instruction_code in processed_vectors:
         processed_vectors[instruction_code][1].close()
 
     if non_riscv == 0:
-        print(f"Parsed {total} {model} Vectors")
+        logger.info(f"Parsed {total} {model} Vectors")
     else:
-        print(f"Parsed {total} {model} Vectors, {non_riscv} Tests Were Non-RISC-V Instructions")
+        logger.info(f"Parsed {total} {model} Vectors, {non_riscv} Tests Were Non-RISC-V Instructions")
