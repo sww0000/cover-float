@@ -11,7 +11,7 @@ import logging
 import random
 from random import seed
 from pathlib import Path
-from typing import TextIO
+from typing import TextIO, cast
 
 import cover_float.common.constants as const
 import cover_float.common.log as log
