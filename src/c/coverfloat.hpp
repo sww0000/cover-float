@@ -11,12 +11,43 @@
 #include <cstring>
 #include <string>
 
+// These definitions are in the modified copy, and the build fails without them, even though they are never touched
+// in an unmodified coverfloat build.
+#ifdef UNMODIFIED_SOFTFLOAT
+typedef struct {
+    bool sign;
+    int32_t exp;
+    uint64_t sig64;
+    uint64_t sig0;
+    uint64_t sigExtra64;
+    uint64_t sigExtra0;
+
+    uint64_t fmaPreAddition[4];
+} intermResult_t;
+
+typedef struct {
+    uint64_t sigProd[4];
+    uint64_t sigC[2];
+    int32_t signed_shift;
+    enum {
+        NONE = 0,
+        PROD_ADD_C,
+        PROD_SUB_C,
+        C_SUB_PROD,
+    } mode;
+} fmaFullShiftInfo_t;
+
+extern THREAD_LOCAL intermResult_t softfloat_intermediateResult;
+extern THREAD_LOCAL fmaFullShiftInfo_t softfloat_fmaAddShiftInfo;
+#endif
+
 #define TEST_VECTOR_WIDTH_BITS 576
 #define COVER_VECTOR_WIDTH_BITS 1208
 
 #define TEST_VECTOR_WIDTH_HEX 144
 #define COVER_VECTOR_WIDTH_HEX 302
 
+#define TEST_VECTOR_WIDTH_HEX_WITH_SEPARATORS (TEST_VECTOR_WIDTH_HEX + 8)
 #define COVER_VECTOR_WIDTH_HEX_WITH_SEPARATORS (COVER_VECTOR_WIDTH_HEX + 12)
 
 // #define INTERM_SIG_LENGTH 256

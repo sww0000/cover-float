@@ -15,10 +15,10 @@ std::string run_test_vector(const std::string &test_vector, bool suppress_error_
         throw py::value_error("Error running test vector: " + test_vector + "\nModel Information: " + res);
     }
 
-    return res;
+    return res.substr(0, TEST_VECTOR_WIDTH_HEX_WITH_SEPARATORS);
 }
 
-PYBIND11_MODULE(_reference, m) {
+PYBIND11_MODULE(_unmodified_reference, m) {
     m.doc() = "Python bindings for the unmodified coverfloat reference model. Use these functions to verify the "
               "correctness of our changes to softfloat";
 
