@@ -5,9 +5,9 @@ from pathlib import Path
 
 import cover_float.common.log as log
 import cover_float.testgen as tg
+from cover_float.common.constants import config
 from cover_float.common.util import SingleThreadedExecutor
 from cover_float.reference import run_test_vector
-from cover_float.scripts.parse_testvectors import format_output, parse_test_vector
 
 logging.basicConfig(level=logging.INFO)
 
@@ -32,22 +32,6 @@ def main() -> None:
             outfile.write(result)
 
 
-def auto_parse(model_name: str, output_dir: str) -> None:
-    input_path = Path(output_dir) / "testvectors" / f"{model_name}_tv.txt"
-    output_path = Path(output_dir) / "readable" / f"{model_name}_parsed.txt"
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    count = 0
-    with input_path.open("r") as infile, output_path.open("w") as outfile:
-        for line in infile:
-            parsed = parse_test_vector(line)
-            if parsed:
-                outfile.write(format_output(parsed) + "\n")
-                count += 1
-    print(f"Parsed {count} {model_name} vectors to {output_path}")
-
-
 def testgen() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -61,11 +45,14 @@ def testgen() -> None:
     parser.add_argument("--output-dir", type=str, default="tests", help="Directory to save generated test vectors")
     parser.add_argument("--single-thread", action="store_true", help="Run Generation in a Single Thread")
     parser.add_argument("--jobs", type=int, default=None, help="Number of Jobs to Run When Multi-Threaded")
+    parser.add_argument(
+        "--partial-output", action="store_true", help="Create a Reduced Number of Tests in Test Heavy Models"
+    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
-
     single_thread = args.single_thread or (args.models is not None and len(args.models) < 2)
+    config.FULL_COVERAGE_TESTGEN = not args.partial_output
 
     if single_thread:
         executor = SingleThreadedExecutor()

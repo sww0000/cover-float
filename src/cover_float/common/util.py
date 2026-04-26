@@ -128,7 +128,7 @@ def unpack_test_vector(tv: str) -> UnpackedTestVector:
         raise ValueError(f"Too Few Parts in Test Vector: {tv}")
 
     op = parts[0]
-    rounding_mode = parts[2]
+    rounding_mode = parts[1]
     input1 = int(parts[2], 16)
     input2 = int(parts[3], 16)
     input3 = int(parts[4], 16)
