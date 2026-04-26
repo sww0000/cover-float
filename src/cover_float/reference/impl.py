@@ -1,6 +1,7 @@
 from typing import TextIO
 
 import cover_float._reference
+import cover_float._unmodified_reference
 from cover_float.common.constants import TEST_VECTOR_WIDTH_HEX_WITH_SEPARATORS
 
 
@@ -18,3 +19,9 @@ def store_cover_vector(cover_vector: str, test_file: TextIO, cover_file: TextIO)
     generated_test_vector = cover_vector[:TEST_VECTOR_WIDTH_HEX_WITH_SEPARATORS]
     test_file.write(generated_test_vector + "\n")
     cover_file.write(cover_vector.strip() + "\n")
+
+
+def verify_test_vector(test_vector: str) -> bool:
+    output_vector = cover_float._unmodified_reference.run_test_vector(test_vector)
+
+    return output_vector[:TEST_VECTOR_WIDTH_HEX_WITH_SEPARATORS].strip() == test_vector.strip()

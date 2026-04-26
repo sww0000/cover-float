@@ -13,6 +13,7 @@ from typing import TextIO, cast
 import cover_float.common.log as log
 from cover_float.common import constants
 from cover_float.common.util import unpack_test_vector
+from cover_float.reference import run_test_vector_unmodified, verify_test_vector
 from cover_float.scripts.parse_testvectors import format_output, parse_test_vector
 
 
@@ -115,6 +116,12 @@ def postprocess_testvectors(
             parsed = parse_test_vector(line)
             if parsed:
                 readable_vectors.write(format_output(parsed) + "\n")
+
+                if not verify_test_vector(line):
+                    logger.exception(
+                        f"Covervector Failed Verification: {line}, Expected: {run_test_vector_unmodified(line)}"
+                    )
+                    breakpoint()
 
             try:
                 unpacked = unpack_test_vector(line)
