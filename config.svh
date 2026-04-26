@@ -28,7 +28,7 @@
 // `define COVER_B25
 // `define COVER_B26
 // `define COVER_B27
-// `define COVER_B28
+`define COVER_B28
 // `define COVER_B29
 
 // define macros for which precisions to check coverage for
