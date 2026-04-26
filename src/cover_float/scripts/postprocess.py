@@ -121,7 +121,6 @@ def postprocess_testvectors(
                     logger.exception(
                         f"Covervector Failed Verification: {line}, Expected: {run_test_vector_unmodified(line)}"
                     )
-                    breakpoint()
 
             try:
                 unpacked = unpack_test_vector(line)
