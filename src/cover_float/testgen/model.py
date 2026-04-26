@@ -63,15 +63,14 @@ def _run_model_by_name(
     general_handler.addFilter(log.ExcludeStatusFilter())
     model_logger.addHandler(general_handler)
 
-    with tv_path.open("w") as test_f, cv_path.open("w") as cover_f:
-        try:
+    try:
+        with tv_path.open("w") as test_f, cv_path.open("w") as cover_f:
             GLOBAL_MODEL_FUNCTIONS[model_name](test_f, cover_f)
-        except Exception as e:
-            logger = logging.getLogger(model_name)
-            logger.exception(f"[bold red]Fatal Error in {model_name}[/] ", exc_info=e, extra={"markup": True})
-
-    if post_process:
-        auto_parse(model_name, str(output_dir))
+        if post_process:
+            auto_parse(model_name, str(output_dir))
+    except Exception as e:
+        logger = logging.getLogger(model_name)
+        logger.exception(f"[bold red]Fatal Error in {model_name}[/] ", exc_info=e, extra={"markup": True})
 
 
 def register_model(

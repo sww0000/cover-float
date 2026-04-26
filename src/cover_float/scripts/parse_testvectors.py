@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Optional, cast
 
 import cover_float.common.log as log
+from cover_float.reference import run_test_vector_unmodified, verify_test_vector
 
 FMT_SPECS: dict[str, dict[str, Any]] = {
     "00": {"name": "f16", "type": "float", "exp_bits": 5, "man_bits": 10, "bias": 15, "total_bits": 16},
@@ -297,6 +298,11 @@ def auto_parse(model_name: str, output_dir: str) -> None:
                 if parsed:
                     outfile.write(format_output(parsed) + "\n")
                     count += 1
+
+                    if not verify_test_vector(line):
+                        logger.exception(
+                            f"Covervector Failed Verification: {line}, Expected: {run_test_vector_unmodified(line)}"
+                        )
 
                 now = time.monotonic()
                 update_size += len(line)
